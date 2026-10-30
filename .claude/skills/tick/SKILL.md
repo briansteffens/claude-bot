@@ -22,8 +22,8 @@ time. All state lives on GitHub (see CLAUDE.md), so re-derive everything from th
 
 For each project, list **open** issues labeled `claude`, plus issues closed in the
 last 7 days that carry a non-terminal `claude:*` phase label. Separately, note the
-5 most recently closed `claude:done` issues across all projects for the
-dashboard's "Recently merged". For each open/active issue:
+`dashboard_merged` (default 25) most recently closed `claude:done` issues across
+all projects for the dashboard's "Recently merged". For each open/active issue:
 
 - Find the status comment: the comment whose body starts with
   `<!-- claude-bot:status`. Parse its JSON (schema in the work-issue skill). No
@@ -201,7 +201,11 @@ _Nothing else is waiting on you._ · Checked <UTC time>
 | 4 | #18 Sound | ⏳ queued | — | — | — | |
 
 ## Recently merged
-- minefield-commander#9 Fog — merged 2026-10-29 · [PR #4](…)   (last 5)
+| Merged | What | Links |
+| --- | --- | --- |
+| 10-30 08:51 | minefield-commander#2 No army mode | [PR #14](…) · [issue](…) |
+| 10-29 17:20 | bay-area-pirates#2 Add sound effects | [PR #5](…) · [issue](…) |
+(newest first, up to `dashboard_merged` rows)
 ```
 
 - **Needs you** = every issue in `needs-input`, `in-review` or `blocked` (not
