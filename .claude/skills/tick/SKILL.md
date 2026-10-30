@@ -210,12 +210,17 @@ _Nothing else is waiting on you._ · Checked <UTC time>
 ```
 
 - **Needs you** = every issue in `needs-input` or `blocked`, plus `in-review`
-  ones whose `review_state` is `"ready"` (missing counts as ready) — not
+  ones whose `review_state` is `"ready"` (inferred if missing, see below) — not
   `claude:paused` — newest `waiting_since` first, times in UTC (add the date if
   it's not today). Use full URLs: the PR, the status JSON's `preview`, and the
   issue for items without a PR (blocked early, or a design discussed on the
   issue because the project uses `design_venue: issue`). If none, write
   `_Nothing needs you right now._`.
+- No `review_state` (workers started before it existed): infer it. If the newest
+  owner comment or review on the PR is later than both the PR's last commit and
+  the bot's last PR comment, treat it as `"revising"`; otherwise `"ready"`. For
+  the revision number, count bot PR comments that say "Revision <n> ready", else
+  use 1, or say "updated" if commits landed after the owner's feedback.
 - In-review Action text: `▶️ ready to play & merge` for revision 1 (or no
   `revision`), `▶️ ready to test revision <n>` after that. An in-review issue
   with `review_state: "revising"` is *not* in Needs you; it shows in In progress
