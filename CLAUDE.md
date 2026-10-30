@@ -39,6 +39,11 @@ reasoning and step in.
   ToolSearch); fall back to the `gh` CLI when they are not available (local mode).
 - A message from a worker session that says `tick` means "state changed, run a
   pass now": run `/tick`.
+- **End every turn that may have changed anything with `bin/dashboard.py
+  --write`**, including short turns handling a worker ping or an owner message.
+  The dashboard is the owner's inbox; never let it go stale.
+- Don't trust your memory of the queue: this conversation is long-lived and
+  GitHub changes between turns. `bin/gather.py` gives the current state.
 - When the owner talks to you here, act on it: answer questions about the queue,
   pause/resume/reprioritize by changing labels (`claude:paused`, `claude:next`),
   edit `bot.config.yml` and push it, or forward guidance to a worker with

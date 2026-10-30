@@ -68,6 +68,27 @@ def phase_label(labels):
     return [p for p in phases if p not in ("next", "paused")]
 
 
+def infer_review_state(repo, pr_number, owners):
+    """For workers that predate review_state: whose turn is it on this PR?"""
+    conversation = gh(f"repos/{repo}/issues/{pr_number}/comments?per_page=100")
+    reviews = gh(f"repos/{repo}/pulls/{pr_number}/reviews?per_page=100")
+    commits = gh(f"repos/{repo}/pulls/{pr_number}/commits?per_page=100")
+    owner_times = [c["created_at"] for c in conversation
+                   if c["user"]["login"] in owners and not (c.get("body") or "").startswith(BOT_MARKER)]
+    owner_times += [r["submitted_at"] for r in reviews
+                    if r["user"]["login"] in owners and (r.get("body") or "").strip() and r.get("submitted_at")]
+    bot_comments = [c for c in conversation if (c.get("body") or "").startswith(BOT_MARKER)]
+    bot_times = [c["created_at"] for c in bot_comments]
+    commit_times = [c["commit"]["committer"]["date"] for c in commits]
+    latest_owner = max(owner_times, default="")
+    latest_bot = max(bot_times + commit_times, default="")
+    revisions = [int(n) for c in bot_comments for n in re.findall(r"Revision (\d+) ready", c.get("body") or "")]
+    return {
+        "inferred_review_state": "revising" if latest_owner > latest_bot else "ready",
+        "inferred_revision": max(revisions, default=1),
+    }
+
+
 def describe_issue(repo, issue, owners):
     labels = [label["name"] for label in issue["labels"]]
     comments = gh(f"repos/{repo}/issues/{issue['number']}/comments?per_page=100")
@@ -109,6 +130,13 @@ def describe_issue(repo, issue, owners):
             "head_sha": pr["head"]["sha"],
             "head_ref": pr["head"]["ref"],
         }
+        body = pr.get("body") or ""
+        heading = body.find("Try it")
+        if heading >= 0:
+            link = re.search(r"https?://[^\s)>\]]+", body[heading:heading + 600])
+            entry["pr"]["try_it_url"] = link.group(0) if link else None
+        if entry["phase"] == "in-review" and pr["state"] == "open" and not (status or {}).get("review_state"):
+            entry["pr"].update(infer_review_state(repo, pr_number, owners))
     return entry
 
 
@@ -201,7 +229,18 @@ def main():
             project["counts"][entry["phase"]] = project["counts"].get(entry["phase"], 0) + 1
         snapshot["projects"].append(project)
 
-    snapshot["recently_merged"].sort(key=lambda m: m["closed_at"], reverse=True)
+    # Merged PRs whose issue the bot hasn't finalized yet (still labelled
+    # in-review) count as merged too, so they don't vanish from both lists.
+    listed = {(m["repo"], m["number"]) for m in snapshot["recently_merged"]}
+    for project in snapshot["projects"]:
+        for issue in project["issues"]:
+            pr = issue.get("pr") or {}
+            if pr.get("merged") and (project["repo"], issue["number"]) not in listed:
+                snapshot["recently_merged"].append({
+                    "repo": project["repo"], "number": issue["number"], "title": issue["title"],
+                    "url": issue["url"], "closed_at": issue.get("closed_at") or pr.get("merged_at"),
+                })
+    snapshot["recently_merged"].sort(key=lambda m: m["closed_at"] or "", reverse=True)
     snapshot["recently_merged"] = snapshot["recently_merged"][:merged_count]
     cache = load_cache()
     for merged in snapshot["recently_merged"]:

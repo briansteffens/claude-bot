@@ -185,65 +185,30 @@ In inline mode, perform the same step yourself by following the work-issue skill
 
 ## 4. Dashboard
 
-If `dashboard_issue` is true, keep one open issue in this repo titled
-`claude-bot queue` (create it if missing; find it by title). It's the owner's
-inbox: when a Claude notification goes off, they open this to see what needs them,
-so it must be complete and current. Rewrite it on **every** tick (the "Checked"
-line changes each time; that's intended, it's how the owner knows it's fresh):
+If `dashboard_issue` is true, the `claude-bot queue` issue in this repo is the
+owner's inbox, so it must reflect GitHub as of now. It's rendered by a script,
+not by hand:
 
-```
-<!-- claude-bot -->
-## 🔔 Needs you
-| Since | What | Action | Links |
-| --- | --- | --- | --- |
-| 14:20 | bay-area-pirates#10 Time skip | ▶️ ready to test revision 2 | [PR #11](…) · [**Preview**](…) |
-| 14:02 | minefield-commander#1 Add music | ▶️ ready to play & merge | [PR #5](…) · [**Preview**](…) |
-| 13:40 | minefield-commander#2 No army mode | ❓ 1 question on the design | [PR #6](…) |
-| 12:15 | bay-area-pirates#3 Ferry routes | ⛔ blocked: needs a call on save format | [PR #8](…) · [issue](…) |
-
-_Nothing else is waiting on you._ · Checked <UTC time>
-
-## In progress
-### <owner>/<repo> · slots 2/2
-| # | Issue | Phase | PR | Preview | Session | Notes |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | #12 Add jump | 🔨 building | #30 | — | [open](https://claude.ai/code/...) | slot |
-| 2 | #14 Bear pathing | 🔧 responding to feedback (rev 2 coming) | #29 | [▶️](…) | [open](...) | slot |
-| 3 | #15 High scores | ✅ approved | #31 | — | [open](...) | waiting: touches the HUD code #12 is changing |
-| 4 | #18 Sound | ⏳ queued | — | — | — | |
-
-## Recently merged
-| Merged | What | 💬 Comments | Links |
-| --- | --- | --- | --- |
-| 10-30 08:51 | minefield-commander#2 No army mode | 6 (3 yours) | [PR #14](…) · [issue](…) |
-| 10-29 17:20 | bay-area-pirates#2 Add sound effects | 0 | [PR #5](…) · [issue](…) |
-(newest first, up to `dashboard_merged` rows; comments = PR conversation comments
-+ inline review comments + reviews with a body, from the snapshot's `comments` /
-`owner_comments`; "yours" omitted when 0; `—` if no PR was found)
+```bash
+bin/dashboard.py --write          # gathers fresh, renders, updates the issue
 ```
 
-- **Needs you** = every issue in `needs-input` or `blocked`, plus `in-review`
-  ones whose `review_state` is `"ready"` (inferred if missing, see below) — not
-  `claude:paused` — newest `waiting_since` first, times in UTC (add the date if
-  it's not today). Use full URLs: the PR, the status JSON's `preview`, and the
-  issue for items without a PR (blocked early, or a design discussed on the
-  issue because the project uses `design_venue: issue`). If none, write
-  `_Nothing needs you right now._`.
-- No `review_state` (workers started before it existed): infer it. If the newest
-  owner comment or review on the PR is later than both the PR's last commit and
-  the bot's last PR comment, treat it as `"revising"`; otherwise `"ready"`. For
-  the revision number, count bot PR comments that say "Revision <n> ready", else
-  use 1, or say "updated" if commits landed after the owner's feedback.
-- In-review Action text: `▶️ ready to play & merge` for revision 1 (or no
-  `revision`), `▶️ ready to test revision <n>` after that. An in-review issue
-  with `review_state: "revising"` is *not* in Needs you; it shows in In progress
-  as `🔧 responding to feedback (rev <n+1> coming)`, while its last preview link
-  stays in the Preview column.
-- If the status JSON has no `preview` (older workers didn't record it), use the
-  link under the PR body's "▶️ Try it" heading. If there's still none, the item
-  goes in anyway with "preview missing" in Action, so a gap is visible rather than
-  silent.
-- Omit empty projects from "In progress" except for a one-line `idle`.
+(or `bin/dashboard.py /tmp/claude-bot-snapshot.json --write` to reuse this pass's
+snapshot if nothing changed since step 1). It prints `updated #N` or
+`unchanged #N`.
+
+**Run it at the end of every turn in which anything may have changed**: full
+passes, handling a worker's `tick` ping, finalizing a merge, acting on something
+the owner typed here. A turn that doesn't end with it leaves the owner looking at
+a stale inbox. If it fails, say so in your reply and fix the cause.
+
+What it shows (so you know what to keep in the status JSON): "Needs you" rows for
+`needs-input`, `blocked`, and `in-review` issues whose review state is ready
+(recorded `review_state`, or inferred from PR activity for older workers), with PR
+and preview links (`preview`, else the PR body's "Try it" link) and the
+revision; "In progress" per project with slots, phases and the parallelism
+verdicts from each issue's `parallel` (`reason` when not safe); and "Recently
+merged" with PR comment counts. To change the layout, edit `bin/dashboard.py`.
 
 ## 5. Schedule the next tick
 
