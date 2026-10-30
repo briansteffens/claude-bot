@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -36,11 +37,25 @@ def load_settings():
     return config, projects
 
 
+def zone():
+    """The owner's timezone from bot.config.yml (default Pacific)."""
+    import yaml
+    config = yaml.safe_load(open(os.path.join(ROOT, "bot.config.yml")))
+    return ZoneInfo(config.get("timezone") or "America/Los_Angeles")
+
+
+TZ = zone()
+
+
+def clock(moment):
+    return moment.strftime("%I:%M%p").lstrip("0").lower()
+
+
 def when(stamp, today):
     if not stamp:
         return ""
-    moment = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-    return moment.strftime("%H:%M") if moment.date() == today else moment.strftime("%m-%d %H:%M")
+    moment = datetime.fromisoformat(stamp.replace("Z", "+00:00")).astimezone(TZ)
+    return clock(moment) if moment.date() == today else f"{moment:%b} {moment.day} {clock(moment)}"
 
 
 def link(text, url):
@@ -119,7 +134,7 @@ def phase_text(issue):
     }.get(phase, phase)
 
 
-def notes_for(issue, slots_full):
+def notes_for(issue, slots_full, holders):
     status = issue.get("status") or {}
     if issue["paused"]:
         return "paused"
@@ -130,17 +145,20 @@ def notes_for(issue, slots_full):
     parallel = status.get("parallel") or {}
     if parallel.get("ok") is False and parallel.get("reason"):
         return f"waiting: {parallel['reason']}"
-    if parallel.get("ok") and parallel.get("with"):
-        safe = ", ".join(f"#{n}" for n in parallel["with"])
-        return f"waiting for a build slot (safe with {safe})" if slots_full else f"safe with {safe}"
-    return "waiting for a build slot"
+    # A verdict only means something against what's building now.
+    current = [n for n in parallel.get("with") or [] if n in holders]
+    if parallel.get("ok") and current:
+        safe = ", ".join(f"#{n}" for n in current)
+        return f"waiting for a build slot (safe with {safe})" if slots_full else f"next up (safe with {safe})"
+    return "waiting for a build slot" if slots_full else "next up"
 
 
 def project_section(project, settings, today):
     repo = project["repo"]
     issues = [i for i in project["issues"] if live(i)]
     total = settings.get("build_slots", 2)
-    used = sum(1 for i in issues if i["phase"] in HOLDING)
+    holders = {i["number"] for i in issues if i["phase"] in HOLDING}
+    used = len(holders)
     if not issues:
         return [f"### {repo}", "idle", ""]
     lines = [f"### {repo} · slots {used}/{total}",
@@ -155,7 +173,7 @@ def project_section(project, settings, today):
         session = link("open", status.get("session_url")) if status.get("session_url") else "—"
         lines.append(
             f"| {position} | {link('#' + str(issue['number']), issue['url'])} {issue['title']} | {phase_text(issue)} | {pr_cell} "
-            f"| {link('▶️', preview) if preview else '—'} | {session} | {notes_for(issue, used >= total)} |"
+            f"| {link('▶️', preview) if preview else '—'} | {session} | {notes_for(issue, used >= total, holders)} |"
         )
     lines.append("")
     return lines
@@ -177,15 +195,16 @@ def merged_section(snapshot, today):
 
 def render(snapshot):
     _, projects = load_settings()
-    checked = datetime.fromisoformat(snapshot["checked_at"].replace("Z", "+00:00"))
+    checked = datetime.fromisoformat(snapshot["checked_at"].replace("Z", "+00:00")).astimezone(TZ)
     today = checked.date()
+    checked_text = f"{checked:%b} {checked.day} {clock(checked)} {checked:%Z}"
     lines = ["<!-- claude-bot -->", "## 🔔 Needs you"]
     rows = needs_you_rows(snapshot, today)
     if rows:
         lines += ["| Since | What | Action | Links |", "| --- | --- | --- | --- |"] + rows
-        lines += ["", f"_Nothing else is waiting on you._ · Checked {checked:%Y-%m-%d %H:%M} UTC"]
+        lines += ["", f"_Nothing else is waiting on you._ · Checked {checked_text}"]
     else:
-        lines += [f"_Nothing needs you right now._ · Checked {checked:%Y-%m-%d %H:%M} UTC"]
+        lines += [f"_Nothing needs you right now._ · Checked {checked_text}"]
     if snapshot.get("errors"):
         lines += ["", "> ⚠️ Some data couldn't be fetched this pass: " + "; ".join(snapshot["errors"])[:500]]
     lines += ["", "## In progress", ""]

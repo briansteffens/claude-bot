@@ -150,5 +150,7 @@ schedule:
 # Keep a "claude-bot queue" issue in this repo with a live table of every
 # project's queue. Handy as a single place to watch progress.
 dashboard_issue: true
+# Timezone for times on the dashboard (IANA name).
+timezone: America/Los_Angeles
 # How many merged issues the dashboard's "Recently merged" table shows.
 dashboard_merged: 25
