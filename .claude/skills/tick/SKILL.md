@@ -185,6 +185,7 @@ line changes each time; that's intended, it's how the owner knows it's fresh):
 ## 🔔 Needs you
 | Since | What | Action | Links |
 | --- | --- | --- | --- |
+| 14:20 | bay-area-pirates#10 Time skip | ▶️ ready to test revision 2 | [PR #11](…) · [**Preview**](…) |
 | 14:02 | minefield-commander#1 Add music | ▶️ ready to play & merge | [PR #5](…) · [**Preview**](…) |
 | 13:40 | minefield-commander#2 No army mode | ❓ 1 question on the design | [PR #6](…) |
 | 12:15 | bay-area-pirates#3 Ferry routes | ⛔ blocked: needs a call on save format | [PR #8](…) · [issue](…) |
@@ -196,7 +197,7 @@ _Nothing else is waiting on you._ · Checked <UTC time>
 | # | Issue | Phase | PR | Preview | Session | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | #12 Add jump | 🔨 building | #30 | — | [open](https://claude.ai/code/...) | slot |
-| 2 | #14 Bear pathing | 👀 in review | #29 | [▶️](…) | [open](...) | slot |
+| 2 | #14 Bear pathing | 🔧 responding to feedback (rev 2 coming) | #29 | [▶️](…) | [open](...) | slot |
 | 3 | #15 High scores | ✅ approved | #31 | — | [open](...) | waiting: touches the HUD code #12 is changing |
 | 4 | #18 Sound | ⏳ queued | — | — | — | |
 
@@ -208,12 +209,18 @@ _Nothing else is waiting on you._ · Checked <UTC time>
 (newest first, up to `dashboard_merged` rows)
 ```
 
-- **Needs you** = every issue in `needs-input`, `in-review` or `blocked` (not
-  `claude:paused`), newest `waiting_since` first, times in UTC (add the date if
+- **Needs you** = every issue in `needs-input` or `blocked`, plus `in-review`
+  ones whose `review_state` is `"ready"` (missing counts as ready) — not
+  `claude:paused` — newest `waiting_since` first, times in UTC (add the date if
   it's not today). Use full URLs: the PR, the status JSON's `preview`, and the
   issue for items without a PR (blocked early, or a design discussed on the
   issue because the project uses `design_venue: issue`). If none, write
   `_Nothing needs you right now._`.
+- In-review Action text: `▶️ ready to play & merge` for revision 1 (or no
+  `revision`), `▶️ ready to test revision <n>` after that. An in-review issue
+  with `review_state: "revising"` is *not* in Needs you; it shows in In progress
+  as `🔧 responding to feedback (rev <n+1> coming)`, while its last preview link
+  stays in the Preview column.
 - If the status JSON has no `preview` (older workers didn't record it), use the
   link under the PR body's "▶️ Try it" heading. If there's still none, the item
   goes in anyway with "preview missing" in Action, so a gap is visible rather than
