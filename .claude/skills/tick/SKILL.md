@@ -20,25 +20,36 @@ time. All state lives on GitHub (see CLAUDE.md), so re-derive everything from th
 
 ## 1. Gather
 
-For each project, list **open** issues labeled `claude`, plus issues closed in the
-last 7 days that carry a non-terminal `claude:*` phase label. Separately, note the
-`dashboard_merged` (default 25) most recently closed `claude:done` issues across
-all projects for the dashboard's "Recently merged". For each open/active issue:
+**Always start from a fresh snapshot — never from what you remember.** This
+conversation is long-lived; issues get labelled, commented on and merged between
+passes, and anything you recall from an earlier pass may be stale. Run:
 
-- Find the status comment: the comment whose body starts with
-  `<!-- claude-bot:status`. Parse its JSON (schema in the work-issue skill). No
-  status comment → phase `queued`.
-- Collect owner comments on the **issue** (author in `owners`, body without
-  `<!-- claude-bot`) with id greater than `handled_through`. Comments and reviews
-  on the issue's PR (draft design PR or build PR) go straight to the worker through
-  its PR subscription, so ignore them here — except in inline mode, where nothing
-  is subscribed: there, also collect owner PR comments/reviews newer than the
-  bot's last comment on that PR.
-- If the state has a `pr`, read the PR's state (draft / open / merged / closed).
-- In `sessions` mode, if the state has a `session`, `get_session` it and note
-  `status_bucket` (working / blocked / review_ready / completed / failed).
+```bash
+bin/gather.py > /tmp/claude-bot-snapshot.json
+```
 
-Queue order within a project: `claude:next` first, then by issue number ascending.
+It lists, per project, every open issue labelled `claude` (including ones with no
+status comment yet — those are `queued`), plus recently closed issues still
+carrying an active phase label, each with its parsed status JSON, unhandled owner
+issue comments (after `handled_through`) and PR state; and the most recently
+merged `claude:done` issues for the dashboard. Issues come pre-sorted in queue
+order (`claude:next` first, then issue number). Read just what you need from the
+file (e.g. with `python3 -c` or `jq`) rather than dumping it all into the
+conversation.
+
+**Every issue in the snapshot must be reconciled below and must appear on the
+dashboard.** If the script fails, say so in the report and fall back to listing
+issues yourself (GitHub MCP `list_issues` with label `claude`, state open, for
+each project) — don't skip the pass.
+
+Then, in `sessions` mode, for each issue whose status has a `session`,
+`get_session` it and note `status_bucket` (working / blocked / review_ready /
+completed / failed).
+
+Comments and reviews on an issue's PR (draft design PR or build PR) go straight to
+the worker through its PR subscription, so they're not in the snapshot — except in
+inline mode, where nothing is subscribed: there, also read owner PR
+comments/reviews newer than the bot's last comment on that PR.
 
 ## 2. Reconcile each issue
 
