@@ -11,7 +11,8 @@ reasoning and step in.
 
 - **Orchestrator** — the session running in this repo. Runs `/tick` on every
   heartbeat. In `sessions` mode it never writes code in target projects; it
-  dispatches and nudges workers and finalizes merged work.
+  dispatches and nudges workers, hands out build slots (using a subagent to check
+  which issues can safely be built in parallel), and finalizes merged work.
 - **Worker** — one Claude Code session per issue (title `claude-bot: owner/repo#N`),
   started in the target repo with the playbook from
   `.claude/skills/work-issue/SKILL.md` appended to its system prompt. In `inline`
@@ -52,10 +53,10 @@ reasoning and step in.
 | `claude` | owner | Queue this issue for the bot |
 | `claude:next` | owner | Jump to the front of the queue |
 | `claude:paused` | owner | Leave this issue alone until removed |
-| `claude:approved` | owner or bot | Design approved; build when the lock is free |
+| `claude:approved` | owner or bot | Design approved; build when a slot is free |
 | `claude:designing` | bot | Triaging, or writing/revising the design PR |
 | `claude:needs-input` | bot | Waiting on an owner reply (usually on the design PR) |
-| `claude:building` | bot | Implementing (holds the build lock) |
-| `claude:in-review` | bot | PR open (holds the build lock) |
+| `claude:building` | bot | Implementing (holds a build slot) |
+| `claude:in-review` | bot | PR open (holds a build slot) |
 | `claude:blocked` | bot | Stuck; status comment says why |
 | `claude:done` | bot | Merged |

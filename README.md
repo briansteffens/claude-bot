@@ -15,14 +15,14 @@ type into, while GitHub issues stay the main interface.
                          ┌──────────────────────────────────────┐
   hourly heartbeat ───▶  │ Orchestrator session (this repo)     │ ◀── you: "pause #15",
   + 10-min polls while   │ /tick: read bot.config.yml, scan     │     "what's queued?"
-    work is in flight    │ labels + status comments, hold the   │
-                         │ build lock, dispatch/nudge workers   │
+    work is in flight    │ labels + status comments, hand out   │
+                         │ build slots, dispatch/nudge workers  │
                          └──────┬───────────────┬───────────────┘
                      create_session │      send_message │ BUILD / ACTIVITY / MERGED
                                 ▼                   ▼
           ┌───────────────────────────┐   ┌───────────────────────────┐
           │ Worker: my-game#12        │   │ Worker: my-game#15        │  one session per
-          │ in-review (holds lock)    │   │ needs-input: draft design │  issue, open them
+          │ in-review (holds a slot)  │   │ needs-input: draft design │  issue, open them
           │ subscribed to its PR      │   │ PR, subscribed to it      │  in the Claude app
           └─────────────┬─────────────┘   └─────────────┬─────────────┘
                         ▼                               ▼
@@ -30,9 +30,15 @@ type into, while GitHub issues stay the main interface.
         PRs and PRs with "▶️ Try it" links  ──▶  you comment / approve / merge on the PR
 ```
 
-- **One build at a time per project.** Only one issue per repo can be `building`
-  or `in-review`. The next build starts from the freshly merged default branch, so
-  PRs don't conflict. (Set `build_lock: global` for one at a time across all repos.)
+- **Two build slots per project, filled only with work that won't collide.** The
+  queue head always gets the first slot. Before handing out another, the
+  orchestrator has a subagent compare the candidates against what's already
+  building: their footprints (files and systems each change touches, recorded by
+  the workers) and the in-progress diffs. A music change can build next to a
+  rework of how a bear moves; a UI bug fix next to a new biome; two changes to
+  the same HUD code wait their turn. When one PR merges, the other worker merges
+  the new base, re-checks and refreshes its preview. (`build_slots: 1` makes it
+  strictly sequential; `build_scope: global` shares the slots across repos.)
 - **Design only when it's worth it.** With `design_stage: auto` the worker skips
   the design round for straightforward issues (posting its plan and assumptions on
   the issue so you can object) and goes straight to building. Issues with real
@@ -61,7 +67,7 @@ type into, while GitHub issues stay the main interface.
 | queued | `claude` | Waiting its turn | — |
 | designing | `claude:designing` | Worker triages: straightforward → posts plan and skips to approved; otherwise opens a draft design PR | — |
 | needs-input | `claude:needs-input` | Draft PR with design + numbered questions 🔔 | Answer on the PR. Once nothing is unclear the bot moves on by itself; no "approve" needed |
-| approved | `claude:approved` | Waits for the project's build lock | — |
+| approved | `claude:approved` | Waits for a build slot (a second slot only if it won't collide with what's building) | — |
 | building | `claude:building` | Implements on the PR branch (merged up to the latest base), tests, plays it in headless Chromium | — |
 | in-review | `claude:in-review` | PR open with a **▶️ Try it** link 🔔; fixes CI and review feedback | Play it, review, merge |
 | done | `claude:done` | Wrap-up comment, issue closed 🔔, next issue starts | — |

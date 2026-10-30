@@ -15,10 +15,10 @@ owners:
 #   inline   - the orchestrator session does all the work itself (local mode).
 mode: auto
 
-# Which issues may be in "building"/"in-review" at the same time:
-#   per-project - one per repo (repos can't conflict with each other). Default.
-#   global      - one across every configured repo.
-build_lock: per-project
+# Where build slots live:
+#   per-project - each repo has its own `build_slots`. Default.
+#   global      - `build_slots` is shared across every configured repo.
+build_scope: per-project
 
 # Defaults applied to every project unless the project overrides them.
 defaults:
@@ -28,6 +28,12 @@ defaults:
   #          building starts once your answers leave nothing unclear.
   # always - every issue gets a draft design PR first, even simple ones.
   design_stage: auto
+  # How many issues may be building or in review at once. The first slot goes
+  # to the queue head; extra slots only go to issues that a quick analysis
+  # (a subagent comparing footprints and diffs) finds won't conflict with
+  # what's already in progress, e.g. a music change next to a creature-AI
+  # change, or a UI bug fix next to a new biome. 1 = strictly sequential.
+  build_slots: 2
   # The design is committed on the PR branch as .claude-bot/design-<n>.md.
   # drop - delete it in the build commit; keep - move it to docs/designs/.
   design_doc: drop
@@ -35,7 +41,7 @@ defaults:
   # needs-input / approved) at once. Lets you discuss designs for the next
   # issues while an earlier one is being built or reviewed. Design PRs only
   # touch their own design file, so they never conflict with the build.
-  design_ahead: 2
+  design_ahead: 3
   # manual     - bot says "ready to merge" and you press the button.
   # auto-merge - bot enables GitHub auto-merge on the PR; GitHub merges once the
   #              branch protection rules (required reviews / checks) are met.

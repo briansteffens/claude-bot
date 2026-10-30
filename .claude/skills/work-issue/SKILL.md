@@ -21,7 +21,8 @@ messages from the orchestrator are one word:
 | --- | --- |
 | `DESIGN` | Phase **Triage**, then Design if needed. |
 | `ACTIVITY` | Owner commented on the *issue*: re-read and respond (PR activity reaches you directly). |
-| `BUILD` | You hold the build lock: phase **Build**. |
+| `BUILD` | You hold a build slot: phase **Build**. |
+| `SYNC` | Another PR in this project merged: see **Sync**. |
 | `RESUME` | You were blocked: re-read everything and carry on from the current phase. |
 | `MERGED` / `CANCEL` | Unsubscribe from PR activity, make sure the status comment is final, stop. |
 
@@ -49,7 +50,7 @@ The status comment on the issue (id in the brief) is the single record of this
 issue. Its body:
 
 ```
-<!-- claude-bot:status {"phase":"needs-input","session":"session_...","session_url":"https://claude.ai/code/session_...","branch":"claude/issue-12-add-jump","pr":31,"design":"pr","design_rev":1,"handled_through":123456789,"updated":"2026-10-30T14:02Z"} -->
+<!-- claude-bot:status {"phase":"needs-input","session":"session_...","session_url":"https://claude.ai/code/session_...","branch":"claude/issue-12-add-jump","pr":31,"design":"pr","design_rev":1,"footprint":{"files":["src/audio/music/**","src/world/biomes.ts (music field only)","src/main.ts (menu slider)"],"systems":["music","settings menu"]},"handled_through":123456789,"updated":"2026-10-30T14:02Z"} -->
 ### 🤖 claude-bot · ❓ Waiting for your input on #31
 
 - [x] Queued
@@ -62,6 +63,19 @@ Live session: https://claude.ai/code/session_... · Updated 2026-10-30 14:02 UTC
 ```
 
 `design` is `"pr"` when a design discussion was held, `"skipped"` on the fast path.
+
+`footprint` is what this change touches: files or globs (with a note on *which
+part* of a shared file, e.g. "biomes.ts (music field only)") and the game/app
+systems involved. Another issue may be built in parallel with yours, and the
+orchestrator decides that from footprints, so keep it honest:
+
+- Set it in Triage (fast path) or Design, from your plan.
+- Once you're building, replace `files` with the real list after each push
+  (`git diff --name-only origin/<default>...HEAD`, plus the part-of-file notes).
+- If the work turns out to need a substantial change outside the footprint —
+  especially a shared module, interface or data format — update the footprint
+  *before* making that change and ping the orchestrator `tick`, so it can re-check
+  the parallel build.
 
 Phases: `dispatching` → `designing` → (`needs-input` ⇄ `designing`) → `approved` →
 `building` → `in-review` → `done`, plus `blocked` and `cancelled`.
@@ -76,8 +90,8 @@ On **every** transition:
    `claude:next` and `claude:paused` alone.
 4. If the owner now needs to act, or a milestone landed, **notify** (below).
 5. In sessions mode, `send_message` the orchestrator session the single word
-   `tick` (priority `later`) when you reach `approved`, `done` or `blocked`, so the
-   build lock moves without waiting for the next poll.
+   `tick` (priority `later`) when you reach `approved`, `done` or `blocked`, so
+   build slots move without waiting for the next poll.
 
 ### Notify
 
@@ -117,7 +131,7 @@ Looks straightforward, so I'll skip the design round and go straight to a PR.
 **Assumptions:** the defaults I'm picking (say if you want otherwise).
 ```
 
-— record `design: "skipped"`, set phase `approved`, and wait for `BUILD`. If the
+— record `design: "skipped"` and the `footprint`, set phase `approved`, and wait for `BUILD`. If the
 owner objects before then, treat it like design feedback (open a design PR).
 
 **Otherwise** (questions that matter, several real approaches, a big or risky change,
@@ -166,8 +180,8 @@ start on a first draft; no separate approval needed.
    preview (see Build step 5) and link it.
 3. `subscribe_pr_activity` for the PR. From here, owner comments and reviews on
    the PR wake you directly.
-4. Comment on the issue: `Design discussion: #<pr>` (one line). Record `pr`, set
-   `design: "pr"`, phase `needs-input`, notify.
+4. Comment on the issue: `Design discussion: #<pr>` (one line). Record `pr` and the
+   `footprint`, set `design: "pr"`, phase `needs-input`, notify.
 
 ### Handling owner feedback (PR comments, reviews, issue comments)
 
@@ -194,7 +208,9 @@ free-form:
 
 ## Phase: Build
 
-Only start on `BUILD` (or when inline and the orchestrator decides you hold the lock).
+Only start on `BUILD` (or when inline and the orchestrator gives you a slot).
+Another issue may be building at the same time in its own slot; stay within your
+footprint and avoid drive-by refactors or reformatting of shared files.
 
 1. Set phase `building`.
 2. Get onto the latest base — earlier issues in the queue may have just merged:
@@ -257,6 +273,19 @@ Deviations from the design or assumptions made, follow-up ideas.
   by the owner pressing merge, or by GitHub auto-merge once its rules are met.
 - If the PR is closed without merging, ask on the issue whether to rework or drop
   it; stay `in-review` until the owner answers.
+
+## Sync
+
+On `SYNC` (or whenever your PR shows a conflict with the default branch):
+
+1. `git fetch origin` and `git merge origin/<default branch>` into your branch.
+2. Resolve conflicts so **both** changes survive: the other PR is already merged and
+   approved, so never drop its behaviour to make yours fit. If keeping both needs a
+   real design decision, ask on your PR and set `needs-input`.
+3. Re-run typecheck/tests/build and the headless play-check, covering the merged-in
+   feature too where your change could affect it. Push, refresh the preview.
+4. If conflicts needed more than mechanical resolution, say what you did in a short
+   PR comment. Otherwise no comment needed.
 
 ## Merged
 
