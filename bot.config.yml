@@ -39,14 +39,17 @@ defaults:
   #   instructions - exact commands to run it locally, plus captured output/screenshots
   preview: artifact
 
-projects: []
-# Example:
-#   - repo: briansteffens/my-game
-#     preview: artifact
-#     merge: auto-merge
-#     notes: |
-#       Vanilla JS + canvas, no build step. Run with `npx serve .`.
-#       Tests: `npm test`. Keep bundle dependency-free.
+projects:
+  - repo: briansteffens/minefield-commander
+    preview: artifact
+    notes: |
+      3D Minesweeper in TypeScript + three.js, bundled by esbuild into one
+      self-contained HTML file. `npm ci`, then `npm run typecheck`, `npm test`
+      (vitest), `npm run build`. The build writes dist/index.html (standalone)
+      and dist/artifact.html (fragment made for Artifact publishing — publish
+      that for the PR preview). Pages deploys main via .github/workflows/pages.yml;
+      there is no PR CI, so run typecheck/test/build yourself before pushing.
+      README.md documents the rules in detail: update it when gameplay changes.
 
 schedule:
   # Poll interval while something is waiting on you or in flight. The hourly
