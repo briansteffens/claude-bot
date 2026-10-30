@@ -60,7 +60,7 @@ type into, while GitHub issues stay the main interface.
 | --- | --- | --- | --- |
 | queued | `claude` | Waiting its turn | — |
 | designing | `claude:designing` | Worker triages: straightforward → posts plan and skips to approved; otherwise opens a draft design PR | — |
-| needs-input | `claude:needs-input` | Draft PR with design + numbered questions 🔔 | Comment on the PR: answers, changes, or **approve** (or add `claude:approved`) |
+| needs-input | `claude:needs-input` | Draft PR with design + numbered questions 🔔 | Answer on the PR. Once nothing is unclear the bot moves on by itself; no "approve" needed |
 | approved | `claude:approved` | Waits for the project's build lock | — |
 | building | `claude:building` | Implements on the PR branch (merged up to the latest base), tests, plays it in headless Chromium | — |
 | in-review | `claude:in-review` | PR open with a **▶️ Try it** link 🔔; fixes CI and review feedback | Play it, review, merge |

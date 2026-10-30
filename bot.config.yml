@@ -24,7 +24,8 @@ build_lock: per-project
 defaults:
   # auto   - the worker skips the design round for straightforward issues (clear
   #          scope, one obvious approach, nothing hard to undo) and goes straight
-  #          to a PR; anything else gets a draft design PR you approve first.
+  #          to a PR; anything else gets a draft design PR with questions, and
+  #          building starts once your answers leave nothing unclear.
   # always - every issue gets a draft design PR and waits for your approval.
   design_stage: auto
   # The design is committed on the PR branch as .claude-bot/design-<n>.md.

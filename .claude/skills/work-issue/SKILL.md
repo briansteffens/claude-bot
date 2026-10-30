@@ -157,7 +157,8 @@ Files to touch, tests to add, how it will be playable.
 1. ... (my default if you don't care: ...)
 2. ...
 
-Reply here — answers by number are fine — or say **approve** to start building.
+Reply here — answers by number are fine. Once the questions are answered I'll
+start on a first draft; no separate approval needed.
 ```
 
    Do **not** put `Closes #<n>` in the body yet. If a quick throwaway prototype
@@ -173,13 +174,19 @@ Reply here — answers by number are fine — or say **approve** to start buildi
 Read every owner comment you haven't handled and judge intent — owners write
 free-form:
 
-- Approval ("approve", "lgtm", "go", "ship it", an approving review, or label
-  `claude:approved`) with no outstanding objection → phase `approved`, label
-  `claude:approved`. Reply briefly confirming what you'll build, folding in any
-  answers given alongside the approval.
-- Answers or change requests → update the design file and the PR body
-  (`Design rev N+1`, with a short "What changed" list at the top), reply, stay
-  `needs-input`. Small clarifications can be a reply instead of a revision.
+- **Answers that settle every open question, with nothing left unclear** → that
+  *is* approval; don't ask for an explicit "approve". Fold the answers into the
+  design file and PR body, reply briefly with what you'll build, set phase
+  `approved` (label `claude:approved`) and go on to the first draft.
+- Explicit approval ("approve", "lgtm", "go", "ship it", an approving review, or
+  label `claude:approved`) with no outstanding objection → the same.
+- Answers that leave something genuinely unclear (an answer contradicts the
+  design, opens a new decision, or skips a question that matters) → ask only
+  about that, stay `needs-input`. Skipped questions whose default is fine: take
+  the default and say so.
+- Change requests → update the design file and the PR body (`Design rev N+1`,
+  with a short "What changed" list at the top). If the changes are clear, treat
+  them like answers and move to `approved`; otherwise ask, stay `needs-input`.
 - Questions → answer them; stay `needs-input`.
 - "pause" / "skip" / "cancel" → add `claude:paused`, or for cancel set `cancelled`,
   close the draft PR, remove the `claude` label; confirm in a comment.
