@@ -76,6 +76,41 @@ projects:
       (tools/build_heightmap.py downloads terrain tiles) unless the issue asks.
       Pages deploys the default branch via .github/workflows/pages.yml; there
       is no PR CI. README.md documents controls and features: keep it current.
+  - repo: briansteffens/tonewood
+    preview: artifact
+    notes: |
+      NES space shooter in 6502 assembly (cc65 dialect), UNROM-512 / mapper 30.
+      Read the repo's CLAUDE.md first: bank discipline, trampolines and the JSON
+      -> codegen asset pipeline matter, and comments go on their own line.
+      Toolchain: cc65 (ca65/ld65) + python3; `sudo apt-get install -y cc65` if
+      missing. Build with `bin/build.sh` (flags like --level=N, --god,
+      --levelset=NAME, --ship=... jump straight to the feature); check bank fill
+      with `bin/rom_capacity.py`. Never hand-edit generated/ (it's gitignored);
+      edit data/*.json instead. No test suite and no CI: a clean build plus
+      rom_capacity is the bar, plus running the ROM if you can.
+      Preview: an Artifact page that plays the built ROM in an in-browser NES
+      emulator. It must support mapper 30 (jsnes doesn't), so check before
+      relying on one; build the preview ROM with flags that start at the
+      relevant spot and list them on the page. If no emulator works, the page
+      offers the .nes as a download with the flags and what to look for, and
+      the PR says so. The owner plays in Mesen: phrase debug notes in Mesen terms.
+  - repo: briansteffens/bluesun
+    preview: instructions
+    notes: |
+      C++20 MMO (SFML client, Boost.Asio/OpenSSL server, MySQL), default branch
+      `master`. Read the repo's CLAUDE.md first, and CLEANUP.md before proposing
+      structural changes. -Werror is on. Builds are memory-hungry: configure
+      out of tree and build only what you need with --parallel 2 (`test-all`,
+      then `server`/`client` if touched); deps per README/CI (apt). Run
+      `./test-all` with assets symlinked like CI does. PR CI
+      (.github/workflows/ci.yml) builds and tests every PR: wait for it and
+      fix failures. Bump PROTOCOL_VERSION / ASSET_VERSION in src/version.h when
+      the wire format / asset output changes. Never run the deploy scripts
+      (bin/deploy-*.sh). There's no browser preview and the server needs
+      MySQL, so the PR's "Try it" gives exact build-and-run steps for the
+      owner's machine (docker-compose DB, server, client) and what to do in
+      game to see the change; add map-renderer or debug-tool images when they
+      help show a visual change.
 
 schedule:
   # Poll interval while something is waiting on you or in flight. The hourly
