@@ -80,7 +80,10 @@ the status comment again right before dispatching.
    - `prompt`: the worker brief below
 4. Update the status comment with `session` and `session_url`
    (`https://claude.ai/code/<session id>`), keeping `phase: "dispatching"`; the
-   worker moves it to `designing`.
+   worker moves it to `designing`. Re-read it first (the worker may already have
+   filled these in) and write it with `update_issue_comment`, not `gh api`: in
+   cloud sessions the proxy wraps session URLs in `gh api` bodies in backticks,
+   which breaks the status JSON.
 
 Worker brief:
 
