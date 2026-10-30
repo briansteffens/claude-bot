@@ -1,0 +1,58 @@
+# claude-bot configuration.
+#
+# The orchestrator re-reads this file (after a `git pull`) at the start of every
+# tick, so you can edit it on GitHub and the change takes effect on the next pass.
+
+# GitHub logins the bot takes instructions from. Comments, reviews and labels from
+# anyone else are read as context only, never as instructions.
+owners:
+  - briansteffens
+
+# How work is executed:
+#   auto     - use per-issue worker sessions when the Claude Code cloud tools are
+#              available (create_session etc.), otherwise work inline.
+#   sessions - always spawn one Claude Code cloud session per issue.
+#   inline   - the orchestrator session does all the work itself (local mode).
+mode: auto
+
+# Which issues may be in "building"/"in-review" at the same time:
+#   per-project - one per repo (repos can't conflict with each other). Default.
+#   global      - one across every configured repo.
+build_lock: per-project
+
+# Defaults applied to every project unless the project overrides them.
+defaults:
+  # Wait for an owner to approve the design before writing code. If false, the
+  # bot goes straight to building when its design has no open questions.
+  require_design_approval: true
+  # Max issues per project that may be in a pre-build phase (designing /
+  # needs-input / approved) at once. Lets you answer design questions for the
+  # next issues while an earlier one is being built or reviewed.
+  design_ahead: 2
+  # manual     - bot says "ready to merge" and you press the button.
+  # auto-merge - bot enables GitHub auto-merge on the PR; GitHub merges once the
+  #              branch protection rules (required reviews / checks) are met.
+  merge: manual
+  # How to make the change playable from the PR:
+  #   artifact     - publish a playable build as a private claude.ai Artifact and link it
+  #   pages        - push the build to gh-pages under previews/pr-<n>/ and link it
+  #   instructions - exact commands to run it locally, plus captured output/screenshots
+  preview: artifact
+
+projects: []
+# Example:
+#   - repo: briansteffens/my-game
+#     preview: artifact
+#     merge: auto-merge
+#     notes: |
+#       Vanilla JS + canvas, no build step. Run with `npx serve .`.
+#       Tests: `npm test`. Keep bundle dependency-free.
+
+schedule:
+  # Poll interval while something is waiting on you or in flight. The hourly
+  # heartbeat scheduled task covers idle periods.
+  active_poll_minutes: 10
+
+# Keep a "claude-bot queue" issue in this repo with a live table of every
+# project's queue. Handy as a single place to watch progress.
+dashboard_issue: true
