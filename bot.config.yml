@@ -57,6 +57,19 @@ projects:
       that for the PR preview). Pages deploys main via .github/workflows/pages.yml;
       there is no PR CI, so run typecheck/test/build yourself before pushing.
       README.md documents the rules in detail: update it when gameplay changes.
+  - repo: briansteffens/bay-area-pirates
+    preview: artifact
+    notes: |
+      First/third-person boating RPG on a real-terrain San Francisco Bay, in
+      TypeScript + three.js, built with Vite. `npm ci`, then `npm run typecheck`
+      and `npm run build` (dist/ is a static site with relative paths: an
+      index.html plus JS chunks and public/data/height.png + chart.png, ~5 MB).
+      There is no test runner, so verify by playing it in headless Chromium.
+      For the preview, publish dist/ as a multi-file Artifact (index.html as the
+      page, everything else via `files`). Don't regenerate the heightmap
+      (tools/build_heightmap.py downloads terrain tiles) unless the issue asks.
+      Pages deploys the default branch via .github/workflows/pages.yml; there
+      is no PR CI. README.md documents controls and features: keep it current.
 
 schedule:
   # Poll interval while something is waiting on you or in flight. The hourly
