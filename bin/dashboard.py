@@ -197,10 +197,27 @@ def phase_text(issue):
     return text + progress if phase in ("designing", "building") else text
 
 
+def playbook_version():
+    try:
+        sys.path.insert(0, HERE)
+        import playbook
+        return playbook.version()
+    except Exception:
+        return None
+
+
+PLAYBOOK = playbook_version()
+
+
 def notes_for(issue, slots_full, holders):
     status = issue.get("status") or {}
     if issue["paused"]:
         return "paused"
+    if PLAYBOOK and status.get("session") and status.get("playbook") != PLAYBOOK and issue["phase"] in (
+            "designing", "needs-input", "approved", "building", "in-review"):
+        older = "older playbook (no progress reports)" if not status.get("playbook") else "older playbook"
+        rest = notes_for({**issue, "status": {**status, "playbook": PLAYBOOK}}, slots_full, holders)
+        return f"{rest} · {older}" if rest else older
     if issue["phase"] in HOLDING:
         return "slot"
     if issue["phase"] != "approved":

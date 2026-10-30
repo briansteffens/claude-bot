@@ -65,6 +65,10 @@ Live session: https://claude.ai/code/session_... · Updated 2026-10-30 14:02 UTC
 
 `design` is `"pr"` when a design discussion was held, `"skipped"` on the fast path.
 
+`playbook` is the version from the `Playbook version:` line at the end of this
+playbook. Record it when you first write the status comment and whenever you
+update it, so the dashboard can tell which instructions you're following.
+
 `preview` is the URL of the current playable build (null until there is one), and
 `waiting_since` is when the owner last became the one who needs to act (set it on
 entering `needs-input`, `in-review` or `blocked`, and again whenever you push a new

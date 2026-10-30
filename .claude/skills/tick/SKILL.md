@@ -143,13 +143,15 @@ this tick.
 1. Post the status comment (template in the work-issue skill) with
    `phase: "dispatching"`, `handled_through` = id of the latest owner comment that
    is already in the issue (0 if none), and add label `claude:designing`.
-2. Read `.claude/skills/work-issue/SKILL.md`, drop its front-matter.
+2. Run `bin/playbook.py` **now, for this dispatch** — never reuse playbook text
+   from earlier in this conversation; it changes often. Its last line is
+   `Playbook version: <v>`; check `<v>` equals `bin/playbook.py --version`.
 3. `create_session`:
    - `source_url`: `https://github.com/<owner>/<repo>`
    - `title`: `claude-bot: <owner>/<repo>#<n> <issue title>` (truncate to ~80 chars)
    - `tags`: `["claude-bot", "claude-bot:<owner>/<repo>#<n>"]`
    - `outcome_branch`: `claude/issue-<n>-<short-slug>`
-   - `append_system_prompt`: the playbook text from step 2
+   - `append_system_prompt`: the exact output of step 2, version line included
    - `prompt`: the worker brief below
 4. Update the status comment with `session` and `session_url`
    (`https://claude.ai/code/<session id>`), keeping `phase: "dispatching"`; the
