@@ -153,7 +153,8 @@ Looks straightforward, so I'll skip the design round and go straight to a PR.
 owner objects before then, treat it like design feedback (open a design PR).
 
 **Otherwise** (questions that matter, several real approaches, a big or risky change,
-or `design_stage: always`), go to Design.
+or `design_stage: always`), go to Design — or, if the project sets
+`design_venue: issue`, to **Design on the issue** below.
 
 ## Phase: Design (draft PR)
 
@@ -248,6 +249,13 @@ footprint and avoid drive-by refactors or reformatting of shared files.
    - `pages` — push the build to the `gh-pages` branch under `previews/pr-<n>/` and
      link `https://<owner>.github.io/<repo>/previews/pr-<n>/`.
    - `instructions` — exact copy-paste commands to run it, plus captured output.
+   - `deploy` — the project's CI deploys whatever branch was pushed to a fixed
+     URL (`preview_url`). After pushing, find the workflow run for your head
+     commit and wait for it to finish (use `send_later` to check back rather than
+     blocking). Only when it succeeded is the preview ready: record
+     `preview_url` as `preview`, and in the PR's "Try it" say which commit is
+     live. If it failed, fix it (or report an infra hiccup) before asking for
+     review. Every later push redeploys, so wait again before saying "updated".
    - Whatever the mode, **actually run it**: load it in headless Chromium with
      Playwright (pre-installed in cloud sessions), exercise the new behaviour,
      check the console for errors. Fix what you find before asking for review.
@@ -306,6 +314,18 @@ On `SYNC` (or whenever your PR shows a conflict with the default branch):
    feature too where your change could affect it. Push, refresh the preview.
 4. If conflicts needed more than mechanical resolution, say what you did in a short
    PR comment. Otherwise no comment needed.
+
+## Design on the issue (`design_venue: issue`)
+
+For projects where any push redeploys a shared environment, the design round must
+not push a branch. Same content and rules as the draft-PR design, but:
+
+- Post the design as an issue comment (`## Design proposal (rev N)`, same sections),
+  no branch, no PR. Revisions are new comments.
+- Owner replies on the issue reach you as `ACTIVITY` from the orchestrator's poll,
+  not instantly; that's the trade-off.
+- Record `design: "issue"`; the first push happens in Build, where you open the PR
+  (fast-path style) with the settled design in a collapsed `<details>` block.
 
 ## Merged
 

@@ -50,7 +50,13 @@ defaults:
   #   artifact     - publish a playable build as a private claude.ai Artifact and link it
   #   pages        - push the build to gh-pages under previews/pr-<n>/ and link it
   #   instructions - exact commands to run it locally, plus captured output/screenshots
+  #   deploy       - CI deploys every pushed branch to `preview_url`; the worker
+  #                  waits for the deploy of its commit, then links that URL
   preview: artifact
+  # pr    - design discussions happen on a draft PR (instant replies).
+  # issue - design discussions happen in issue comments, with no branch pushed
+  #         until the build; for repos where any push redeploys something.
+  design_venue: pr
 
 projects:
   - repo: briansteffens/minefield-commander
@@ -111,6 +117,30 @@ projects:
       owner's machine (docker-compose DB, server, client) and what to do in
       game to see the change; add map-renderer or debug-tool images when they
       help show a visual change.
+  - repo: briansteffens/bar-manager
+    # build.yml deploys EVERY pushed branch to barmanager.briansf.com, so the
+    # live site is the preview: one PR at a time, and no pushes during design.
+    build_slots: 1
+    design_venue: issue
+    preview: deploy
+    preview_url: https://barmanager.briansf.com
+    notes: |
+      Management sim in Godot 4.4, typed GDScript. The default (live) branch is
+      `claude/bar-manager-game-design-j0jyvh`, not main: branch from and target
+      that (check `git remote show origin` if it changes). Read the repo's
+      CLAUDE.md and README first. Balance is out of scope: report balance
+      oddities in one paragraph, never tune Balance constants or run long
+      probes. Tests: `godot --headless --import || true`, then
+      `godot --headless --script res://tests/run_tests.gd` and
+      `res://tools/balance_probe.gd` (seconds each). If godot is missing,
+      install 4.4-stable the way build.yml does. Never edit build.yml.
+      Every push (yours too) runs CI, deploys that branch to
+      https://barmanager.briansf.com (behind Cloudflare Access, one-time PIN)
+      and pings the owner on Slack, so push deliberately: batch fixes, no
+      WIP pushes. The live site is the preview; after merge, the default
+      branch redeploys. The repo has its own game-* agents in .claude/agents
+      (designer, architect, developer, code-reviewer, tester); use them where
+      they help, e.g. game-tester to play a night before asking for review.
 
 schedule:
   # Poll interval while something is waiting on you or in flight. The hourly

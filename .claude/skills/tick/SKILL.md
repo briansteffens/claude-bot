@@ -207,7 +207,8 @@ _Nothing else is waiting on you._ · Checked <UTC time>
 - **Needs you** = every issue in `needs-input`, `in-review` or `blocked` (not
   `claude:paused`), newest `waiting_since` first, times in UTC (add the date if
   it's not today). Use full URLs: the PR, the status JSON's `preview`, and the
-  issue for blocked items without a PR. If none, write
+  issue for items without a PR (blocked early, or a design discussed on the
+  issue because the project uses `design_venue: issue`). If none, write
   `_Nothing needs you right now._`.
 - If the status JSON has no `preview` (older workers didn't record it), use the
   link under the PR body's "▶️ Try it" heading. If there's still none, the item
