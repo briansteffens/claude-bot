@@ -213,11 +213,13 @@ _Nothing else is waiting on you._ · Checked <UTC time>
 | 4 | #18 Sound | ⏳ queued | — | — | — | |
 
 ## Recently merged
-| Merged | What | Links |
-| --- | --- | --- |
-| 10-30 08:51 | minefield-commander#2 No army mode | [PR #14](…) · [issue](…) |
-| 10-29 17:20 | bay-area-pirates#2 Add sound effects | [PR #5](…) · [issue](…) |
-(newest first, up to `dashboard_merged` rows)
+| Merged | What | 💬 Comments | Links |
+| --- | --- | --- | --- |
+| 10-30 08:51 | minefield-commander#2 No army mode | 6 (3 yours) | [PR #14](…) · [issue](…) |
+| 10-29 17:20 | bay-area-pirates#2 Add sound effects | 0 | [PR #5](…) · [issue](…) |
+(newest first, up to `dashboard_merged` rows; comments = PR conversation comments
++ inline review comments + reviews with a body, from the snapshot's `comments` /
+`owner_comments`; "yours" omitted when 0; `—` if no PR was found)
 ```
 
 - **Needs you** = every issue in `needs-input` or `blocked`, plus `in-review`

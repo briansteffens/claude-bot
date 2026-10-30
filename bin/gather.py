@@ -9,6 +9,7 @@ block GraphQL).
 Usage: bin/gather.py [path/to/bot.config.yml]
 """
 import json
+import os
 import re
 import subprocess
 import sys
@@ -111,6 +112,53 @@ def describe_issue(repo, issue, owners):
     return entry
 
 
+CACHE_PATH = os.path.expanduser("~/.cache/claude-bot/merged.json")
+
+
+def load_cache():
+    try:
+        return json.load(open(CACHE_PATH))
+    except (OSError, ValueError):
+        return {}
+
+
+def save_cache(cache):
+    os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
+    json.dump(cache, open(CACHE_PATH, "w"))
+
+
+def merged_pr_stats(repo, issue_number, owners, cache):
+    """PR number and comment counts for a merged issue. Merged PRs don't change,
+    so results are cached across runs."""
+    key = f"{repo}#{issue_number}"
+    if key in cache:
+        return cache[key]
+    _, status = parse_status(gh(f"repos/{repo}/issues/{issue_number}/comments?per_page=100"))
+    pr_number = (status or {}).get("pr")
+    if not pr_number:
+        stats = {"pr": None}
+    else:
+        pr = gh(f"repos/{repo}/pulls/{pr_number}")
+        conversation = gh(f"repos/{repo}/issues/{pr_number}/comments?per_page=100")
+        inline = gh(f"repos/{repo}/pulls/{pr_number}/comments?per_page=100")
+        reviews = [r for r in gh(f"repos/{repo}/pulls/{pr_number}/reviews?per_page=100") if (r.get("body") or "").strip()]
+        everything = conversation + inline + reviews
+
+        def from_owner(c):
+            return c["user"]["login"] in owners and not (c.get("body") or "").startswith(BOT_MARKER)
+
+        stats = {
+            "pr": pr_number,
+            "pr_url": pr["html_url"],
+            "merged_at": pr.get("merged_at"),
+            "comments": len(everything),
+            "owner_comments": sum(1 for c in everything if from_owner(c)),
+        }
+    if stats["pr"] is None or stats.get("merged_at"):
+        cache[key] = stats
+    return stats
+
+
 def queue_key(entry):
     return (0 if entry["next"] else 1, entry["number"])
 
@@ -155,6 +203,13 @@ def main():
 
     snapshot["recently_merged"].sort(key=lambda m: m["closed_at"], reverse=True)
     snapshot["recently_merged"] = snapshot["recently_merged"][:merged_count]
+    cache = load_cache()
+    for merged in snapshot["recently_merged"]:
+        try:
+            merged.update(merged_pr_stats(merged["repo"], merged["number"], owners, cache))
+        except RuntimeError as error:
+            snapshot["errors"].append(str(error))
+    save_cache(cache)
     json.dump(snapshot, sys.stdout, indent=1)
     print()
 
