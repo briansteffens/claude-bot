@@ -26,7 +26,7 @@ defaults:
   #          scope, one obvious approach, nothing hard to undo) and goes straight
   #          to a PR; anything else gets a draft design PR with questions, and
   #          building starts once your answers leave nothing unclear.
-  # always - every issue gets a draft design PR and waits for your approval.
+  # always - every issue gets a draft design PR first, even simple ones.
   design_stage: auto
   # The design is committed on the PR branch as .claude-bot/design-<n>.md.
   # drop - delete it in the build commit; keep - move it to docs/designs/.
