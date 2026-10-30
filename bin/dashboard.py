@@ -98,10 +98,9 @@ def needs_you_rows(snapshot, today):
                 action = "⛔ blocked: see the status comment"
             else:
                 continue
-            if not pr or phase == "blocked":
-                links.append(link("issue", issue["url"]))
             since = status.get("waiting_since") or status.get("updated") or issue["created_at"]
-            rows.append((since, f"| {when(since, today)} | {short(project['repo'])}#{issue['number']} {issue['title']} | {action} | {' · '.join(links)} |"))
+            what = link(f"{short(project['repo'])}#{issue['number']}", issue["url"])
+            rows.append((since, f"| {when(since, today)} | {what} {issue['title']} | {action} | {' · '.join(links) or '—'} |"))
     rows.sort(key=lambda row: row[0], reverse=True)
     return [row for _, row in rows]
 
@@ -163,16 +162,16 @@ def project_section(project, settings, today):
 
 
 def merged_section(snapshot, today):
-    lines = ["## Recently merged", "| Merged | What | 💬 Comments | Links |", "| --- | --- | --- | --- |"]
+    lines = ["## Recently merged", "| Merged | What | 💬 Comments | PR |", "| --- | --- | --- | --- |"]
     for merged in snapshot["recently_merged"]:
         if merged.get("comments") is None:
             comments = "—"
         else:
             comments = str(merged["comments"]) + (f" ({merged['owner_comments']} yours)" if merged.get("owner_comments") else "")
-        links = [link(f"PR #{merged['pr']}", merged.get("pr_url"))] if merged.get("pr") else []
-        links.append(link("issue", merged["url"]))
+        links = link(f"PR #{merged['pr']}", merged.get("pr_url")) if merged.get("pr") else "—"
         stamp = merged.get("merged_at") or merged["closed_at"]
-        lines.append(f"| {when(stamp, today)} | {short(merged['repo'])}#{merged['number']} {merged['title']} | {comments} | {' · '.join(links)} |")
+        what = link(f"{short(merged['repo'])}#{merged['number']}", merged["url"])
+        lines.append(f"| {when(stamp, today)} | {what} {merged['title']} | {comments} | {links} |")
     return lines
 
 
