@@ -209,8 +209,10 @@ _Nothing else is waiting on you._ · Checked <UTC time>
   it's not today). Use full URLs: the PR, the status JSON's `preview`, and the
   issue for blocked items without a PR. If none, write
   `_Nothing needs you right now._`.
-- An in-review item whose `preview` is missing still goes in, with "preview
-  missing" in Action, so a gap is visible rather than silent.
+- If the status JSON has no `preview` (older workers didn't record it), use the
+  link under the PR body's "▶️ Try it" heading. If there's still none, the item
+  goes in anyway with "preview missing" in Action, so a gap is visible rather than
+  silent.
 - Omit empty projects from "In progress" except for a one-line `idle`.
 
 ## 5. Schedule the next tick
