@@ -140,18 +140,61 @@ def needs_you_rows(snapshot, today):
     return rows
 
 
+STALE_MINUTES = 30
+
+
+def progress_of(issue):
+    """The worker's self-reported progress for the stage it's in now, or None.
+    Reports from an earlier stage (e.g. design progress once building) are ignored."""
+    status = issue.get("status") or {}
+    progress = status.get("progress") or {}
+    stage = issue["phase"]
+    if stage == "in-review":
+        stage = "revising" if review(issue)[0] == "revising" else None
+    if not progress or progress.get("stage") != stage or stage not in ("designing", "building", "revising"):
+        return None
+    done, total = progress.get("done"), progress.get("total")
+    pct = progress.get("pct")
+    if pct is None and done is not None and total:
+        pct = round(100 * done / total)
+    minutes = None
+    if progress.get("at"):
+        at = datetime.fromisoformat(progress["at"].replace("Z", "+00:00"))
+        minutes = max(0, int((datetime.now(timezone.utc) - at).total_seconds() // 60))
+    return {"pct": pct, "done": done, "total": total, "step": progress.get("step"),
+            "minutes_ago": minutes, "stale": minutes is not None and minutes >= STALE_MINUTES}
+
+
+def progress_text(progress):
+    if not progress or progress["pct"] is None:
+        return ""
+    filled = round(progress["pct"] / 20)
+    text = f" {'▰' * filled}{'▱' * (5 - filled)} {progress['pct']}%"
+    if progress.get("done") is not None and progress.get("total"):
+        text += f" ({progress['done']}/{progress['total']})"
+    if progress.get("step"):
+        text += f": {progress['step']}"
+    minutes = progress.get("minutes_ago")
+    if minutes is not None:
+        age = "just now" if minutes < 1 else f"{minutes}m ago" if minutes < 60 else f"{minutes // 60}h ago"
+        text += f" · ⚠️ no update for {age[:-4]}" if progress["stale"] else f" · {age}"
+    return text
+
+
 def phase_text(issue):
     phase = issue["phase"]
     status = issue.get("status") or {}
+    progress = progress_text(progress_of(issue))
     if phase == "in-review":
         state, revision = review(issue)
-        return f"🔧 responding to feedback (rev {revision + 1} coming)" if state == "revising" else "👀 in review"
+        return f"🔧 responding to feedback (rev {revision + 1} coming){progress}" if state == "revising" else "👀 in review"
     if phase == "approved":
         return "✅ approved (fast path)" if status.get("design") == "skipped" else "✅ approved"
-    return {
+    text = {
         "queued": "⏳ queued", "dispatching": "🚚 starting", "designing": "✏️ designing",
         "needs-input": "❓ needs input", "building": "🔨 building", "blocked": "⛔ blocked",
     }.get(phase, phase)
+    return text + progress if phase in ("designing", "building") else text
 
 
 def notes_for(issue, slots_full, holders):
@@ -189,6 +232,7 @@ def project_state(project, settings):
             "review_state": state, "revision": revision, "paused": issue["paused"], "next": issue["next"],
             "pr": pr_of(issue), "preview": preview_of(issue) if issue["phase"] == "in-review" else None,
             "session_url": status.get("session_url"),
+            "progress": progress_of(issue),
             "notes": notes_for(issue, slots["used"] >= slots["total"], holders),
         })
     return slots, items

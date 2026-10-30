@@ -76,6 +76,35 @@ play it, comment or merge) or `"revising"` (yours: working on their feedback).
 `revision` counts the builds the owner has been handed: 1 for the first, +1 each
 time you hand back a revised one.
 
+### Progress
+
+While you're working (stages `designing`, `building`, and `revising` = in-review
+with `review_state: "revising"`), keep `progress` in the status JSON so the
+dashboard can show how far along you are:
+
+```json
+"progress": {"stage": "building", "done": 3, "total": 7, "step": "wiring the menu slider", "at": "2026-10-30T14:02Z"}
+```
+
+- **Count steps, don't guess a percentage.** At the start of each stage write a
+  short checklist (4–10 steps) and report `done` / `total`; the dashboard derives
+  the percentage. Only report a bare `pct` where steps don't fit.
+  - `designing`: read the issue and code (1) · settled the approach (2) · drafted
+    the design (3) · posted it (4).
+  - `building`: the plan's implementation steps, then the standard tail: tests
+    pass · built · play-checked · preview published · PR ready. Keep the
+    checklist in the status comment's human part too, ticking items as you go.
+  - `revising`: one step per piece of owner feedback, then the same tail.
+- `step` is what you're on now, in a few words; `at` is when you wrote it.
+- **Update it whenever a step completes** (one status-comment edit; batch steps
+  that finish within a couple of minutes). A step running longer than ~20
+  minutes gets an update anyway, with `step` saying what's taking the time:
+  the dashboard flags reports older than 30 minutes as stalled.
+- If the work turns out bigger, it's fine for `total` to grow; say so in `step`
+  ("found 2 more call sites").
+- Set a fresh `progress` (with the new `stage`) when you enter a stage; it's
+  ignored once you've left it.
+
 `footprint` is what this change touches: files or globs (with a note on *which
 part* of a shared file, e.g. "biomes.ts (music field only)") and the game/app
 systems involved. Another issue may be built in parallel with yours, and the
@@ -134,7 +163,7 @@ on.
 
 ## Phase: Triage
 
-Set phase `designing`, read the issue and enough of the codebase to know what the
+Set phase `designing` with `progress` at `0/4` (see Progress), read the issue and enough of the codebase to know what the
 change involves, then decide whether a design discussion is worth the owner's time.
 
 **Skip it (fast path)** when all of these hold — and `design_stage` is `auto`:
@@ -236,7 +265,8 @@ Only start on `BUILD` (or when inline and the orchestrator gives you a slot).
 Another issue may be building at the same time in its own slot; stay within your
 footprint and avoid drive-by refactors or reformatting of shared files.
 
-1. Set phase `building`.
+1. Set phase `building`, write the build checklist from the approved plan (plus
+   the standard tail) and set `progress` to `0/<total>` (see Progress).
 2. Get onto the latest base — earlier issues in the queue may have just merged:
    - existing design PR branch: `git fetch origin` then
      `git merge origin/<default branch>` (no force-pushing needed);
@@ -301,7 +331,8 @@ Deviations from the design or assumptions made, follow-up ideas.
 - Follow your environment's rules for PR activity (CI failures, review comments,
   merge conflicts). Owner review comments are instructions; others' are input to weigh.
 - **Owner feedback that needs changes** (review comments, change requests, a bug
-  they hit in the preview): before starting, set `review_state: "revising"`, ack
+  they hit in the preview): before starting, set `review_state: "revising"` and a
+  `revising` `progress` checklist (one step per piece of feedback, plus the tail), ack
   briefly on the PR ("On it: <one-line summary>"), and ping the orchestrator
   `tick`, so the dashboard shows you're on it instead of waiting on them. Batch
   everything they raised into one revision.
