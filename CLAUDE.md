@@ -43,6 +43,9 @@ reasoning and step in.
   every minute) and **end every turn that may have changed anything with
   `bin/dashboard.py --write`**, including short turns handling a worker ping or an owner message.
   The dashboard is the owner's inbox; never let it go stale.
+  `--write` also keeps the same dashboard as JSON in a
+  `<!-- claude-bot:dashboard-data -->` comment on the queue issue, which the
+  factory web app (`briansteffens/factory`) reads; don't edit or delete it.
 - Don't trust your memory of the queue: this conversation is long-lived and
   GitHub changes between turns. `bin/gather.py` gives the current state.
 - When the owner talks to you here, act on it: answer questions about the queue,

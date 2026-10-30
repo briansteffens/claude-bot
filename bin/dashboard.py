@@ -6,11 +6,13 @@ write it to the "claude-bot queue" issue.
 GitHub as of that moment rather than whatever the orchestrator remembers.
 
 Usage:
-  bin/dashboard.py [snapshot.json] [--write]
+  bin/dashboard.py [snapshot.json] [--write | --json]
 
 With no snapshot path it runs bin/gather.py itself. --write PATCHes the
-dashboard issue (found by title in this repo) with the rendered body;
-otherwise the markdown is printed.
+dashboard issue (found by title in this repo) with the rendered body and keeps
+the same dashboard as data in a comment on that issue (a JSON code block after
+a `<!-- claude-bot:dashboard-data -->` marker, read by the factory web app);
+--json prints that data; otherwise the markdown is printed.
 """
 import json
 import os
@@ -79,33 +81,38 @@ def preview_of(issue):
     return (issue.get("status") or {}).get("preview") or (issue.get("pr") or {}).get("try_it_url")
 
 
+def pr_of(issue):
+    pr = issue.get("pr")
+    if not pr:
+        return None
+    return {key: pr.get(key) for key in ("number", "url", "state", "draft", "merged", "head_ref")}
+
+
 def live(issue):
     """Still the bot's business: open, not paused, PR not merged."""
     pr = issue.get("pr") or {}
     return issue["state"] == "open" and not pr.get("merged") and issue["phase"] not in ("done", "cancelled")
 
 
-def needs_you_rows(snapshot, today):
-    rows = []
+def needs_you(snapshot):
+    """Issues waiting on the owner, newest first, as plain data."""
+    items = []
     for project in snapshot["projects"]:
         for issue in project["issues"]:
             if not live(issue) or issue["paused"]:
                 continue
             status = issue.get("status") or {}
-            pr = issue.get("pr") or {}
             phase = issue["phase"]
-            links = []
-            if pr:
-                links.append(link(f"PR #{pr['number']}", pr["url"]))
+            item = {"repo": project["repo"], "number": issue["number"], "title": issue["title"], "url": issue["url"],
+                    "phase": phase, "pr": pr_of(issue), "preview": None, "revision": None}
             if phase == "in-review":
                 state, revision = review(issue)
                 if state != "ready":
                     continue
+                item["revision"] = revision
+                item["preview"] = preview_of(issue)
                 action = "▶️ ready to play & merge" if revision <= 1 else f"▶️ ready to test revision {revision}"
-                preview = preview_of(issue)
-                if preview:
-                    links.append(link("**Preview**", preview))
-                else:
+                if not item["preview"]:
                     action += " (preview missing)"
             elif phase == "needs-input":
                 action = "❓ waiting on your answers"
@@ -113,11 +120,24 @@ def needs_you_rows(snapshot, today):
                 action = "⛔ blocked: see the status comment"
             else:
                 continue
-            since = status.get("waiting_since") or status.get("updated") or issue["created_at"]
-            what = link(f"{short(project['repo'])}#{issue['number']}", issue["url"])
-            rows.append((since, f"| {when(since, today)} | {what} {issue['title']} | {action} | {' · '.join(links) or '—'} |"))
-    rows.sort(key=lambda row: row[0], reverse=True)
-    return [row for _, row in rows]
+            item["action"] = action
+            item["since"] = status.get("waiting_since") or status.get("updated") or issue["created_at"]
+            items.append(item)
+    items.sort(key=lambda item: item["since"], reverse=True)
+    return items
+
+
+def needs_you_rows(snapshot, today):
+    rows = []
+    for item in needs_you(snapshot):
+        links = []
+        if item["pr"]:
+            links.append(link(f"PR #{item['pr']['number']}", item["pr"]["url"]))
+        if item["preview"]:
+            links.append(link("**Preview**", item["preview"]))
+        what = link(f"{short(item['repo'])}#{item['number']}", item["url"])
+        rows.append(f"| {when(item['since'], today)} | {what} {item['title']} | {item['action']} | {' · '.join(links) or '—'} |")
+    return rows
 
 
 def phase_text(issue):
@@ -153,27 +173,43 @@ def notes_for(issue, slots_full, holders):
     return "waiting for a build slot" if slots_full else "next up"
 
 
-def project_section(project, settings, today):
-    repo = project["repo"]
+def project_state(project, settings):
+    """Slot usage and the live issues of one project, in dashboard order, as plain data."""
     issues = [i for i in project["issues"] if live(i)]
-    total = settings.get("build_slots", 2)
     holders = {i["number"] for i in issues if i["phase"] in HOLDING}
-    used = len(holders)
-    if not issues:
-        return [f"### {repo}", "idle", ""]
-    lines = [f"### {repo} · slots {used}/{total}",
-             "| # | Issue | Phase | PR | Preview | Session | Notes |",
-             "| --- | --- | --- | --- | --- | --- | --- |"]
+    slots = {"used": len(holders), "total": settings.get("build_slots", 2)}
     ranked = sorted(issues, key=lambda i: ORDER.index(i["phase"]) if i["phase"] in ORDER else len(ORDER))
+    items = []
     for position, issue in enumerate(ranked, 1):
         status = issue.get("status") or {}
-        pr = issue.get("pr") or {}
+        state, revision = review(issue) if issue["phase"] == "in-review" else (None, None)
+        items.append({
+            "position": position, "repo": project["repo"], "number": issue["number"], "title": issue["title"],
+            "url": issue["url"], "phase": issue["phase"], "phase_text": phase_text(issue),
+            "review_state": state, "revision": revision, "paused": issue["paused"], "next": issue["next"],
+            "pr": pr_of(issue), "preview": preview_of(issue) if issue["phase"] == "in-review" else None,
+            "session_url": status.get("session_url"),
+            "notes": notes_for(issue, slots["used"] >= slots["total"], holders),
+        })
+    return slots, items
+
+
+def project_section(project, settings, today):
+    repo = project["repo"]
+    slots, items = project_state(project, settings)
+    if not items:
+        return [f"### {repo}", "idle", ""]
+    lines = [f"### {repo} · slots {slots['used']}/{slots['total']}",
+             "| # | Issue | Phase | PR | Preview | Session | Notes |",
+             "| --- | --- | --- | --- | --- | --- | --- |"]
+    for item in items:
+        pr = item["pr"]
         pr_cell = link(f"#{pr['number']}", pr["url"]) + (" (draft)" if pr.get("draft") else "") if pr else "—"
-        preview = preview_of(issue) if issue["phase"] == "in-review" else None
-        session = link("open", status.get("session_url")) if status.get("session_url") else "—"
+        preview = item["preview"]
+        session = link("open", item["session_url"]) if item["session_url"] else "—"
         lines.append(
-            f"| {position} | {link('#' + str(issue['number']), issue['url'])} {issue['title']} | {phase_text(issue)} | {pr_cell} "
-            f"| {link('▶️', preview) if preview else '—'} | {session} | {notes_for(issue, used >= total, holders)} |"
+            f"| {item['position']} | {link('#' + str(item['number']), item['url'])} {item['title']} | {item['phase_text']} | {pr_cell} "
+            f"| {link('▶️', preview) if preview else '—'} | {session} | {item['notes']} |"
         )
     lines.append("")
     return lines
@@ -214,6 +250,29 @@ def render(snapshot):
     return "\n".join(lines) + "\n"
 
 
+def model(snapshot):
+    """The dashboard as data, for the factory web app (dashboard.json)."""
+    config, projects = load_settings()
+    sections = []
+    for project in snapshot["projects"]:
+        settings = projects.get(project["repo"], {})
+        slots, items = project_state(project, settings)
+        sections.append({
+            "repo": project["repo"], "slots": slots, "issues": items,
+            "settings": {key: settings.get(key) for key in ("merge", "preview", "preview_url", "design_venue", "build_slots")},
+        })
+    return {
+        "version": 1,
+        "checked_at": snapshot["checked_at"],
+        "timezone": config.get("timezone") or "America/Los_Angeles",
+        "owners": config.get("owners") or [],
+        "errors": snapshot.get("errors") or [],
+        "needs_you": needs_you(snapshot),
+        "projects": sections,
+        "recently_merged": snapshot["recently_merged"],
+    }
+
+
 def gh(*args, input_text=None):
     result = subprocess.run(["gh", "api", *args], input=input_text, capture_output=True, text=True)
     if result.returncode != 0:
@@ -239,12 +298,57 @@ def write(body):
         # The proxy appends an attribution footer to bodies it writes; ignore it.
         current = (found[0].get("body") or "").split("\n---\n_Generated by")[0].strip()
         if current == body.strip():
-            return f"unchanged #{number}"
+            return number, f"unchanged #{number}"
         gh("-X", "PATCH", f"repos/{repo}/issues/{number}", "--input", "-", input_text=payload)
-        return f"updated #{number}"
+        return number, f"updated #{number}"
     created = gh("-X", "POST", f"repos/{repo}/issues", "--input", "-",
                  input_text=json.dumps({"title": DASHBOARD_TITLE, "body": body}))
-    return f"created #{created['number']}"
+    return created["number"], f"created #{created['number']}"
+
+
+DATA_MARKER = "<!-- claude-bot:dashboard-data -->"
+DATA_CACHE = os.path.expanduser("~/.cache/claude-bot/dashboard-data.json")
+# Publish at least this often even when nothing changed, so checked_at shows the loop is alive.
+DATA_HEARTBEAT_SECONDS = 300
+# GitHub caps comment bodies at 65536 characters; leave room for the marker and footer.
+DATA_MAX_CHARS = 60000
+
+
+def data_body(data):
+    """The data comment: marker, then the JSON in a code block. Drops the oldest
+    merged entries if it would be too long for a comment."""
+    data = dict(data, recently_merged=list(data["recently_merged"]))
+    while True:
+        body = f"{DATA_MARKER}\n```json\n{json.dumps(data, sort_keys=True, ensure_ascii=False)}\n```"
+        if len(body) <= DATA_MAX_CHARS or not data["recently_merged"]:
+            return body
+        data["recently_merged"].pop()
+        data["truncated"] = True
+
+
+def publish_data(data, number):
+    """Keep the dashboard as JSON in a comment on the dashboard issue (the
+    factory web app reads it). Skips the edit when only checked_at changed,
+    except for a heartbeat every few minutes."""
+    try:
+        last = json.load(open(DATA_CACHE))
+    except (OSError, ValueError):
+        last = {}
+    stable = {k: v for k, v in data.items() if k != "checked_at"}
+    age = datetime.now(timezone.utc).timestamp() - last.get("published", 0)
+    if last.get("data") == stable and last.get("issue") == number and age < DATA_HEARTBEAT_SECONDS:
+        return "data unchanged"
+    repo = this_repo()
+    body = json.dumps({"body": data_body(data)})
+    comments = gh(f"repos/{repo}/issues/{number}/comments?per_page=100")
+    found = [c for c in comments if (c.get("body") or "").startswith(DATA_MARKER)]
+    if found:
+        gh("-X", "PATCH", f"repos/{repo}/issues/comments/{found[0]['id']}", "--input", "-", input_text=body)
+    else:
+        gh("-X", "POST", f"repos/{repo}/issues/{number}/comments", "--input", "-", input_text=body)
+    os.makedirs(os.path.dirname(DATA_CACHE), exist_ok=True)
+    json.dump({"data": stable, "issue": number, "published": datetime.now(timezone.utc).timestamp()}, open(DATA_CACHE, "w"))
+    return "data published"
 
 
 def main():
@@ -255,12 +359,20 @@ def main():
         out = subprocess.run([os.path.join(HERE, "gather.py"), os.path.join(ROOT, "bot.config.yml")],
                              capture_output=True, text=True, check=True).stdout
         snapshot = json.loads(out)
+    if "--json" in sys.argv:
+        json.dump(model(snapshot), sys.stdout, indent=1, sort_keys=True, ensure_ascii=False)
+        print()
+        return
     body = render(snapshot)
     if "--write" in sys.argv:
-        print(write(body))
+        number, result = write(body)
+        try:
+            result += ", " + publish_data(model(snapshot), number)
+        except RuntimeError as error:
+            result += f", data failed: {error}"
+        print(result)
     else:
         sys.stdout.write(body)
-
 
 if __name__ == "__main__":
     main()

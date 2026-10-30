@@ -141,6 +141,23 @@ projects:
       branch redeploys. The repo has its own game-* agents in .claude/agents
       (designer, architect, developer, code-reviewer, tester); use them where
       they help, e.g. game-tester to play a night before asking for review.
+  - repo: briansteffens/factory
+    preview: artifact
+    notes: |
+      The software factory web app: the claude-bot dashboard on the left, PRs,
+      issues and previews in a pane on the right, with merge / comment / new
+      issue actions, over the GitHub REST API. TypeScript + Preact, built with
+      Vite. Read the repo's CLAUDE.md first: it covers the data sources, demo
+      mode, link and keyboard conventions, and what the app may and may not do
+      to the bot's labels and comments. `npm ci`, then `npm run typecheck`,
+      `npm test` (vitest) and `npm run build`. Tests and previews never call the
+      real GitHub API: they run in demo mode against the fake GitHub in the repo.
+      For the preview, publish the single-file demo build (`npm run
+      build:artifact`, see CLAUDE.md) as an Artifact and play it in headless
+      Chromium first, at desktop and phone widths. Cloud sessions can't reach
+      GitHub GraphQL, so GraphQL paths (auto-merge) are tested against the fake
+      only: say so in the PR. Cloudflare Pages deploys main. README.md lists
+      the features: keep it current.
 
 schedule:
   # Poll interval while something is waiting on you or in flight. The hourly
