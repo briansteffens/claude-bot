@@ -33,10 +33,12 @@ Re-runnable: every step checks before it creates.
    | `claude:blocked` | `b60205` | claude-bot: stuck, see status |
    | `claude:done` | `0e8a16` | claude-bot: merged |
 
-   With `gh`: `gh label create <name> --repo <o>/<r> --color <c> --description <d>`
-   (ignore "already exists"). The GitHub MCP server may not have a label-create
-   tool; if neither route works, list the missing labels for the owner and note
-   that GitHub also creates a label the first time it's added to an issue.
+   The GitHub MCP server has no label-create tool. Use the REST API through `gh`:
+   `gh api repos/<o>/<r>/labels -f name=<name> -f color=<c> -f description=<d>`
+   (ignore "already_exists"). Avoid `gh label create`: it goes through GraphQL,
+   which cloud sessions block. If that fails too, list the missing labels for the
+   owner and note that GitHub also creates a label the first time it's added to
+   an issue.
 
 5. **Prerequisites per project**, reported as a checklist (don't change repo
    settings yourself):
