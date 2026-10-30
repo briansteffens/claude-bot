@@ -14,7 +14,8 @@ here comes from the owner.
 ## Inputs
 
 Your first message (the brief) gives the repo, issue number, directive, orchestrator
-session id, status comment id, owners, branch name and project settings. Later
+session id, status comment id, owners, branch name, dashboard URL and project
+settings. Later
 messages from the orchestrator are one word:
 
 | Message | Do |
@@ -64,6 +65,12 @@ Live session: https://claude.ai/code/session_... · Updated 2026-10-30 14:02 UTC
 
 `design` is `"pr"` when a design discussion was held, `"skipped"` on the fast path.
 
+`preview` is the URL of the current playable build (null until there is one), and
+`waiting_since` is when the owner last became the one who needs to act (set it on
+entering `needs-input`, `in-review` or `blocked`, and again whenever you push a new
+build for them to look at). The orchestrator builds the owner's "Needs you" list
+on the dashboard from these, so keep them current.
+
 `footprint` is what this change touches: files or globs (with a note on *which
 part* of a shared file, e.g. "biomes.ts (music field only)") and the game/app
 systems involved. Another issue may be built in parallel with yours, and the
@@ -90,17 +97,28 @@ On **every** transition:
    `claude:next` and `claude:paused` alone.
 4. If the owner now needs to act, or a milestone landed, **notify** (below).
 5. In sessions mode, `send_message` the orchestrator session the single word
-   `tick` (priority `later`) when you reach `approved`, `done` or `blocked`, so
-   build slots move without waiting for the next poll.
+   `tick` (priority `later`) whenever you enter `needs-input`, `approved`,
+   `in-review`, `done` or `blocked`, or push a new preview while `in-review`. That
+   moves build slots and refreshes the dashboard within a minute or two.
 
 ### Notify
 
-Send one `PushNotification` (load it with ToolSearch `select:PushNotification`):
-one line, under 200 chars, leading with what the owner should do and naming
-`repo#n`. For example: `my-game#12: design on PR #31, 2 questions` or
-`my-game#12: PR #31 ready to play + merge`. Notify for: questions posted, PR
-ready, blocked, merged. Not for routine progress. If the tool is missing or says
-"not sent", carry on — the GitHub comment is the durable channel.
+The owner gets a Claude notification when your turn ends, and that's what they
+tap. So **whenever you end a turn with the owner needing to act** (questions
+posted, PR ready, blocked), finish with this, links in full:
+
+```
+**<repo>#<n> <title>** — <what you need: "ready to play & merge" / "2 questions on the design" / "blocked: ...">
+- PR: <PR URL>
+- ▶️ Preview: <preview URL>        (omit if none yet)
+- Dashboard: <dashboard URL from the brief>
+```
+
+Also send one `PushNotification` (load it with ToolSearch
+`select:PushNotification`): one line, under 200 chars, leading with what the
+owner should do, e.g. `my-game#12: PR #31 ready to play + merge`. Only for:
+questions posted, PR ready, blocked, merged. If it's missing or "not sent", carry
+on.
 
 ## Comments
 
@@ -225,7 +243,8 @@ footprint and avoid drive-by refactors or reformatting of shared files.
    - `artifact` — build a self-contained playable version (single HTML page, or a
      page plus files) and publish it with the Artifact tool, following that tool's
      rules. Artifacts are private to the owner by default, which is what we want.
-     Use the same file path on each update so the link stays stable.
+     Use the same file path on each update so the link stays stable. Record the
+     URL as `preview` in the status JSON.
    - `pages` — push the build to the `gh-pages` branch under `previews/pr-<n>/` and
      link `https://<owner>.github.io/<repo>/previews/pr-<n>/`.
    - `instructions` — exact copy-paste commands to run it, plus captured output.
@@ -261,7 +280,8 @@ Deviations from the design or assumptions made, follow-up ideas.
 8. If `merge: auto-merge`, enable auto-merge on the PR (squash). If GitHub refuses
    (auto-merge disabled for the repo, or no protection rules), say so in the status
    comment and fall back to manual.
-9. Set phase `in-review` with `pr` filled in; notify (`PR #31 ready to play + merge`).
+9. Set phase `in-review` with `pr`, `preview` and `waiting_since` filled in; notify
+   (`PR #31 ready to play + merge`).
 
 ## Phase: Review
 

@@ -55,10 +55,15 @@ type into, while GitHub issues stay the main interface.
 - **State lives on GitHub** (a status comment with hidden JSON plus a
   `claude:<phase>` label), so containers can be recycled, context can be compacted,
   and the orchestrator can be replaced without losing anything.
-- **Notifications** go out as push notifications from the session at the moments
-  you need to act — design questions posted, PR ready to play, blocked, merged —
-  plus the usual GitHub notifications and a `claude-bot queue` dashboard issue in
-  this repo.
+- **One inbox, kept current.** The `claude-bot queue` issue in this repo opens
+  with **🔔 Needs you**: every PR ready to play and merge, design question and
+  blocker, newest first, each with direct PR and ▶️ preview links. The orchestrator
+  rewrites it on every pass (the "Checked" time shows it's fresh), and workers
+  trigger a pass the moment something lands, so it's up to date within a minute or
+  two. Pin it.
+- **Notifications** come from Claude itself: when a worker stops because it needs
+  you, its session's final message names what it needs and carries the PR,
+  preview and dashboard links, so tapping the notification gets you there.
 
 ### Lifecycle of an issue
 

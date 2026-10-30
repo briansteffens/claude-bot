@@ -21,7 +21,9 @@ time. All state lives on GitHub (see CLAUDE.md), so re-derive everything from th
 ## 1. Gather
 
 For each project, list **open** issues labeled `claude`, plus issues closed in the
-last 7 days that carry a non-terminal `claude:*` phase label. For each issue:
+last 7 days that carry a non-terminal `claude:*` phase label. Separately, note the
+5 most recently closed `claude:done` issues across all projects for the
+dashboard's "Recently merged". For each open/active issue:
 
 - Find the status comment: the comment whose body starts with
   `<!-- claude-bot:status`. Parse its JSON (schema in the work-issue skill). No
@@ -148,6 +150,7 @@ Worker brief:
 You are the claude-bot worker for <owner>/<repo>#<n>: "<title>".
 Directive: DESIGN
 Orchestrator session: <this session id>
+Dashboard: <URL of the claude-bot queue issue>
 Status comment id: <comment id>
 Owners: <logins>
 Branch: claude/issue-<n>-<short-slug>
@@ -172,21 +175,43 @@ In inline mode, perform the same step yourself by following the work-issue skill
 ## 4. Dashboard
 
 If `dashboard_issue` is true, keep one open issue in this repo titled
-`claude-bot queue` (create it if missing; find it by title). Rewrite its body only
-when the content changed:
+`claude-bot queue` (create it if missing; find it by title). It's the owner's
+inbox: when a Claude notification goes off, they open this to see what needs them,
+so it must be complete and current. Rewrite it on **every** tick (the "Checked"
+line changes each time; that's intended, it's how the owner knows it's fresh):
 
 ```
 <!-- claude-bot -->
-_Updated <UTC time>_
+## 🔔 Needs you
+| Since | What | Action | Links |
+| --- | --- | --- | --- |
+| 14:02 | minefield-commander#1 Add music | ▶️ ready to play & merge | [PR #5](…) · [**Preview**](…) |
+| 13:40 | minefield-commander#2 No army mode | ❓ 1 question on the design | [PR #6](…) |
+| 12:15 | bay-area-pirates#3 Ferry routes | ⛔ blocked: needs a call on save format | [PR #8](…) · [issue](…) |
 
+_Nothing else is waiting on you._ · Checked <UTC time>
+
+## In progress
 ### <owner>/<repo> · slots 2/2
-| # | Issue | Phase | PR | Session | Notes |
-| --- | --- | --- | --- | --- | --- |
-| 1 | #12 Add jump | 🔨 building | #30 | [open](https://claude.ai/code/...) | slot |
-| 2 | #14 Bear pathing | 👀 in review | #29 | [open](...) | slot |
-| 3 | #15 High scores | ✅ approved | #31 | [open](...) | waiting: touches the HUD code #12 is changing |
-| 4 | #18 Sound | ⏳ queued | — | — | |
+| # | Issue | Phase | PR | Preview | Session | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | #12 Add jump | 🔨 building | #30 | — | [open](https://claude.ai/code/...) | slot |
+| 2 | #14 Bear pathing | 👀 in review | #29 | [▶️](…) | [open](...) | slot |
+| 3 | #15 High scores | ✅ approved | #31 | — | [open](...) | waiting: touches the HUD code #12 is changing |
+| 4 | #18 Sound | ⏳ queued | — | — | — | |
+
+## Recently merged
+- minefield-commander#9 Fog — merged 2026-10-29 · [PR #4](…)   (last 5)
 ```
+
+- **Needs you** = every issue in `needs-input`, `in-review` or `blocked` (not
+  `claude:paused`), newest `waiting_since` first, times in UTC (add the date if
+  it's not today). Use full URLs: the PR, the status JSON's `preview`, and the
+  issue for blocked items without a PR. If none, write
+  `_Nothing needs you right now._`.
+- An in-review item whose `preview` is missing still goes in, with "preview
+  missing" in Action, so a gap is visible rather than silent.
+- Omit empty projects from "In progress" except for a one-line `idle`.
 
 ## 5. Schedule the next tick
 
@@ -212,6 +237,8 @@ briansteffens/my-game: #12 building · #15 needs-input (2 questions) · #18 queu
 briansteffens/site: idle
 ```
 
-Call out anything that needs the owner. Don't send push notifications from the
-tick itself except for finalize/blocked events above — workers notify for their own
-milestones.
+If anything needs the owner, end with the dashboard's "Needs you" rows as a short
+list with full PR and preview URLs, plus the dashboard URL: the Claude
+notification for this session should be as useful as the workers' ones. Don't send
+push notifications from the tick itself except for finalize/blocked events above —
+workers notify for their own milestones.
