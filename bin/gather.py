@@ -13,6 +13,7 @@ import os
 import re
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 STATUS_MARKER = "<!-- claude-bot:status"
@@ -20,18 +21,62 @@ BOT_MARKER = "<!-- claude-bot"
 ACTIVE_PHASES = {"dispatching", "designing", "needs-input", "approved", "building", "in-review", "blocked"}
 
 
-def gh(path):
-    """GET a REST path, following pagination; returns a list for list endpoints."""
-    result = subprocess.run(
-        ["gh", "api", "--paginate", "--slurp", path],
-        capture_output=True, text=True,
-    )
+ETAG_CACHE_PATH = os.path.expanduser("~/.cache/claude-bot/etags.json")
+_etags = None
+
+
+def _etag_cache():
+    global _etags
+    if _etags is None:
+        try:
+            _etags = json.load(open(ETAG_CACHE_PATH))
+        except (OSError, ValueError):
+            _etags = {}
+    return _etags
+
+
+def save_etag_cache():
+    if _etags is not None:
+        os.makedirs(os.path.dirname(ETAG_CACHE_PATH), exist_ok=True)
+        json.dump(_etags, open(ETAG_CACHE_PATH, "w"))
+
+
+def gh_paginated(path):
+    result = subprocess.run(["gh", "api", "--paginate", "--slurp", path], capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(f"gh api {path}: {result.stderr.strip()}")
     pages = json.loads(result.stdout)
     if pages and isinstance(pages[0], list):
         return [item for page in pages for item in page]
     return pages[0] if len(pages) == 1 else pages
+
+
+def gh(path):
+    """GET a REST path. Uses a conditional request when we've seen it before, so
+    unchanged data comes back as a cheap 304 (this runs every minute)."""
+    cache = _etag_cache()
+    cached = cache.get(path)
+    command = ["gh", "api", "-i", path]
+    if cached:
+        command[3:3] = ["-H", f"If-None-Match: {cached['etag']}"]
+    result = subprocess.run(command, capture_output=True, text=True)
+    head, _, body = result.stdout.replace("\r\n", "\n").partition("\n\n")
+    status_line = head.split("\n", 1)[0]
+    if " 304" in status_line and cached:
+        return cached["body"]
+    if result.returncode != 0 or " 200" not in status_line:
+        raise RuntimeError(f"gh api {path}: {result.stderr.strip() or status_line}")
+    headers = {}
+    for line in head.split("\n")[1:]:
+        name, _, value = line.partition(":")
+        headers[name.strip().lower()] = value.strip()
+    if 'rel="next"' in headers.get("link", ""):
+        # More than one page: rare here, so skip caching and fetch them all.
+        return gh_paginated(path)
+    data = json.loads(body)
+    if headers.get("etag"):
+        cache[path] = {"etag": headers["etag"], "body": data}
+    return data
 
 
 def load_config(path):
@@ -194,7 +239,7 @@ def queue_key(entry):
 def main():
     config_path = sys.argv[1] if len(sys.argv) > 1 else "bot.config.yml"
     repos, owners, merged_count = load_config(config_path)
-    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT00:00:00Z")
     snapshot = {"checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "projects": [], "recently_merged": [], "errors": []}
 
     for repo in repos:
@@ -209,13 +254,12 @@ def main():
         # The issues endpoint also returns PRs; skip them.
         issues = [i for i in issues if "pull_request" not in i]
         closed = [i for i in closed if "pull_request" not in i]
-        for issue in issues:
-            project["issues"].append(describe_issue(repo, issue, owners))
-        for issue in closed:
-            labels = [label["name"] for label in issue["labels"]]
-            if set(phase_label(labels)) & ACTIVE_PHASES:
-                # Closed while still active: /tick finalizes or cancels these.
-                project["issues"].append(describe_issue(repo, issue, owners))
+        # Closed issues still carrying an active phase label: /tick finalizes
+        # or cancels these, so they're included too.
+        wanted = issues + [i for i in closed
+                           if set(phase_label([label["name"] for label in i["labels"]])) & ACTIVE_PHASES]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            project["issues"] = list(pool.map(lambda issue: describe_issue(repo, issue, owners), wanted))
         done = gh(f"repos/{repo}/issues?labels=claude:done&state=closed&sort=updated&per_page={merged_count}")
         for issue in done:
             if "pull_request" not in issue:
@@ -243,12 +287,17 @@ def main():
     snapshot["recently_merged"].sort(key=lambda m: m["closed_at"] or "", reverse=True)
     snapshot["recently_merged"] = snapshot["recently_merged"][:merged_count]
     cache = load_cache()
-    for merged in snapshot["recently_merged"]:
+
+    def add_stats(merged):
         try:
             merged.update(merged_pr_stats(merged["repo"], merged["number"], owners, cache))
         except RuntimeError as error:
             snapshot["errors"].append(str(error))
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        list(pool.map(add_stats, snapshot["recently_merged"]))
     save_cache(cache)
+    save_etag_cache()
     json.dump(snapshot, sys.stdout, indent=1)
     print()
 

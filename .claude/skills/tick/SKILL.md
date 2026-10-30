@@ -17,6 +17,9 @@ time. All state lives on GitHub (see CLAUDE.md), so re-derive everything from th
 3. Resolve the mode. `auto` → `sessions` if `mcp__claude-code-remote__create_session`
    is available, else `inline`.
 4. Note this session's id (`get_session` with no id) — workers need it to ping you.
+5. `bin/dashboard-loop.sh --ensure` — keeps a background loop refreshing the
+   dashboard every minute, independent of how busy or slow this session is. The
+   container can be recycled while idle, which kills it, so ensure it every turn.
 
 ## 1. Gather
 
