@@ -26,9 +26,13 @@ last 7 days that carry a non-terminal `claude:*` phase label. For each issue:
 - Find the status comment: the comment whose body starts with
   `<!-- claude-bot:status`. Parse its JSON (schema in the work-issue skill). No
   status comment → phase `queued`.
-- Collect owner comments (author in `owners`, body without `<!-- claude-bot`) with
-  id greater than `handled_through`.
-- If the state has a `pr`, read the PR's state (open / merged / closed).
+- Collect owner comments on the **issue** (author in `owners`, body without
+  `<!-- claude-bot`) with id greater than `handled_through`. Comments and reviews
+  on the issue's PR (draft design PR or build PR) go straight to the worker through
+  its PR subscription, so ignore them here — except in inline mode, where nothing
+  is subscribed: there, also collect owner PR comments/reviews newer than the
+  bot's last comment on that PR.
+- If the state has a `pr`, read the PR's state (draft / open / merged / closed).
 - In `sessions` mode, if the state has a `session`, `get_session` it and note
   `status_bucket` (working / blocked / review_ready / completed / failed).
 

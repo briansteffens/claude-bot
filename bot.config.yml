@@ -22,12 +22,18 @@ build_lock: per-project
 
 # Defaults applied to every project unless the project overrides them.
 defaults:
-  # Wait for an owner to approve the design before writing code. If false, the
-  # bot goes straight to building when its design has no open questions.
-  require_design_approval: true
+  # auto   - the worker skips the design round for straightforward issues (clear
+  #          scope, one obvious approach, nothing hard to undo) and goes straight
+  #          to a PR; anything else gets a draft design PR you approve first.
+  # always - every issue gets a draft design PR and waits for your approval.
+  design_stage: auto
+  # The design is committed on the PR branch as .claude-bot/design-<n>.md.
+  # drop - delete it in the build commit; keep - move it to docs/designs/.
+  design_doc: drop
   # Max issues per project that may be in a pre-build phase (designing /
-  # needs-input / approved) at once. Lets you answer design questions for the
-  # next issues while an earlier one is being built or reviewed.
+  # needs-input / approved) at once. Lets you discuss designs for the next
+  # issues while an earlier one is being built or reviewed. Design PRs only
+  # touch their own design file, so they never conflict with the build.
   design_ahead: 2
   # manual     - bot says "ready to merge" and you press the button.
   # auto-merge - bot enables GitHub auto-merge on the PR; GitHub merges once the

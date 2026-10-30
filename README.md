@@ -2,8 +2,10 @@
 
 An issue-driven development bot that runs **inside Claude Code**, not as a script
 calling the API. You queue issues by labeling them `claude`; the bot works
-through each project's queue one issue at a time: design proposal and questions,
-your answers, a PR with a playable preview, merge, then the next issue. Every step
+through each project's queue one issue at a time. Straightforward issues go
+straight to a PR with a playable preview; bigger ones start as a draft PR holding
+a design and questions, which you discuss right there before the bot builds on the
+same PR. You merge, and the next issue starts. Every step
 happens in a Claude Code session you can open, read (including its reasoning) and
 type into, while GitHub issues stay the main interface.
 
@@ -20,20 +22,27 @@ type into, while GitHub issues stay the main interface.
                                 ▼                   ▼
           ┌───────────────────────────┐   ┌───────────────────────────┐
           │ Worker: my-game#12        │   │ Worker: my-game#15        │  one session per
-          │ in-review (holds lock)    │   │ needs-input (design only) │  issue, open them
-          │ subscribed to PR events   │   │                           │  in the Claude app
+          │ in-review (holds lock)    │   │ needs-input: draft design │  issue, open them
+          │ subscribed to its PR      │   │ PR, subscribed to it      │  in the Claude app
           └─────────────┬─────────────┘   └─────────────┬─────────────┘
                         ▼                               ▼
-        GitHub: status comment + claude:<phase> label on each issue, design
-        comments, PRs with "▶️ Try it" preview links  ──▶  you reply / approve / merge
+        GitHub: status comment + claude:<phase> label on each issue; draft design
+        PRs and PRs with "▶️ Try it" links  ──▶  you comment / approve / merge on the PR
 ```
 
 - **One build at a time per project.** Only one issue per repo can be `building`
   or `in-review`. The next build starts from the freshly merged default branch, so
   PRs don't conflict. (Set `build_lock: global` for one at a time across all repos.)
+- **Design only when it's worth it.** With `design_stage: auto` the worker skips
+  the design round for straightforward issues (posting its plan and assumptions on
+  the issue so you can object) and goes straight to building. Issues with real
+  questions get a **draft PR** holding the design; the implementation later lands
+  on that same PR.
+- **Conversations happen on the PR, instantly.** Each worker subscribes to its PR,
+  so your comments and reviews wake it within seconds; no polling involved.
 - **Designs run ahead.** While one issue is being built or reviewed, the next
-  `design_ahead` issues get design proposals and questions, so your answers aren't
-  on the critical path.
+  `design_ahead` issues can have design PRs open, so your answers aren't on the
+  critical path. Design PRs only touch their own design file, so they don't conflict.
 - **One session per issue.** Each worker session is titled
   `claude-bot: owner/repo#N …` and linked from the issue's status comment. Open it to
   watch its thinking, or type into it to steer ("use a tilemap instead").
@@ -50,10 +59,10 @@ type into, while GitHub issues stay the main interface.
 | Phase | Label | What happens | Your move |
 | --- | --- | --- | --- |
 | queued | `claude` | Waiting its turn | — |
-| designing | `claude:designing` | Worker reads the code, writes a proposal | — |
-| needs-input | `claude:needs-input` | Design + numbered questions posted 🔔 | Answer, request changes, or say **approve** (or add `claude:approved`) |
+| designing | `claude:designing` | Worker triages: straightforward → posts plan and skips to approved; otherwise opens a draft design PR | — |
+| needs-input | `claude:needs-input` | Draft PR with design + numbered questions 🔔 | Comment on the PR: answers, changes, or **approve** (or add `claude:approved`) |
 | approved | `claude:approved` | Waits for the project's build lock | — |
-| building | `claude:building` | Implements on a fresh branch, tests, plays it in headless Chromium | — |
+| building | `claude:building` | Implements on the PR branch (merged up to the latest base), tests, plays it in headless Chromium | — |
 | in-review | `claude:in-review` | PR open with a **▶️ Try it** link 🔔; fixes CI and review feedback | Play it, review, merge |
 | done | `claude:done` | Wrap-up comment, issue closed 🔔, next issue starts | — |
 | blocked | `claude:blocked` | Says what it needs 🔔 | Reply, e.g. "retry" |
@@ -74,8 +83,9 @@ work at any time.
 The recommended setup uses Claude Code on the web: a long-lived orchestrator session
 woken by a **scheduled task** (hourly heartbeat, plus self-scheduled 10-minute polls
 while something is in flight), spawning a **worker session** per issue. Workers
-**subscribe to their PR's activity**, so reviews and CI results wake them
-immediately; issue comments are picked up by the orchestrator's next poll.
+**subscribe to their PR's activity**, so comments, reviews and CI results wake them
+immediately. The orchestrator's polling only matters for queueing (labels) and for
+the occasional comment left on the issue instead of the PR.
 
 The bot is just Claude Code configuration — `CLAUDE.md`, three skills and a YAML
 file — so the same repo also runs locally.
@@ -152,10 +162,10 @@ exercises the new behaviour before opening the PR.
 
 ## Limits worth knowing
 
-- Scheduled tasks normally run at most hourly; the bot adds one-shot 10-minute polls
-  while work is in flight, so an issue reply is typically picked up within ~10
-  minutes. Say "check now" in the orchestrator session to run `/tick` immediately.
-- PR reviews and CI reach the worker immediately through PR subscriptions.
+- Anything on a PR reaches the worker immediately. Newly labelled issues and
+  comments on the issue itself wait for the next poll: ~10 minutes while work is
+  in flight, otherwise the hourly heartbeat. Say "check now" in the orchestrator
+  session to run `/tick` immediately.
 - A worker that hits a permission prompt waits for you; you'll see it in the session.
 - Finished worker sessions stay in your session list; archive them when you like.
 

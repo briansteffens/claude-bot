@@ -53,8 +53,8 @@ reasoning and step in.
 | `claude:next` | owner | Jump to the front of the queue |
 | `claude:paused` | owner | Leave this issue alone until removed |
 | `claude:approved` | owner or bot | Design approved; build when the lock is free |
-| `claude:designing` | bot | Writing or revising the design |
-| `claude:needs-input` | bot | Waiting on an owner reply |
+| `claude:designing` | bot | Triaging, or writing/revising the design PR |
+| `claude:needs-input` | bot | Waiting on an owner reply (usually on the design PR) |
 | `claude:building` | bot | Implementing (holds the build lock) |
 | `claude:in-review` | bot | PR open (holds the build lock) |
 | `claude:blocked` | bot | Stuck; status comment says why |
