@@ -235,9 +235,11 @@ hourly regardless. Poll faster while things are moving:
 - In inline/local mode under `/loop`, skip this step — the loop paces itself.
 - **New-issue watcher.** Also make sure `bin/watch-new.py` is running as a
   background Bash task of this session (`run_in_background: true`; start one if
-  none is running). It checks every 30s for open `claude` issues with no phase
-  label and exits the moment it finds one, which re-invokes this session: run
-  `/tick` then (it dispatches them) and start the watcher again. This is what
+  none is running), passing every issue this tick left queued on purpose
+  (design_ahead full) as `owner/repo#n` arguments. It checks every 30s for open
+  `claude` issues with no phase label, other than those (unless they get
+  `claude:ping`), and exits the moment it finds one, which re-invokes this
+  session: run `/tick` then (it dispatches them) and start the watcher again. This is what
   gets a new issue a worker within a minute; the polls and the heartbeat are
   backstops for when the container was recycled and the watcher died with it.
 

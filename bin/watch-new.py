@@ -12,8 +12,7 @@ One cheap REST call per project per pass. Exits 0 with output on a hit, and
 exits 0 silently after WATCH_MAX seconds (default 3300) so a stale watcher
 never outlives the session's interest in it.
 
-    bin/watch-new.py          # ignore issues already queued at start
-    bin/watch-new.py --all    # report those too
+    bin/watch-new.py [owner/repo#n ...]   # ignore these queued-on-purpose issues
 """
 import json
 import os
@@ -57,12 +56,12 @@ def queued(repo):
 def main():
     interval = int(os.environ.get("WATCH_INTERVAL", "30"))
     deadline = time.time() + int(os.environ.get("WATCH_MAX", "3300"))
-    # Issues already queued when the watcher starts were seen by the tick that
-    # started it (left queued on purpose, e.g. design_ahead is full): only
-    # report ones that show up after that.
-    known = set() if "--all" in sys.argv else {hit for repo in projects() for hit in queued(repo)}
+    # Issues the tick left queued on purpose (design_ahead full) are passed as
+    # owner/repo#n arguments and ignored, so they don't wake it right back up.
+    # A pinged one is reported anyway (its line ends in "(ping)").
+    known = {a for a in sys.argv[1:] if "#" in a}
     while time.time() < deadline:
-        hits = [hit for repo in projects() for hit in queued(repo) if hit not in known]
+        hits = [hit for repo in projects() for hit in queued(repo) if hit.split(" ", 1)[0] not in known or hit.endswith("(ping)")]
         if hits:
             print("new queued issue(s), run /tick:")
             print("\n".join(hits))
