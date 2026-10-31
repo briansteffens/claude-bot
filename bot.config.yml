@@ -74,6 +74,7 @@ projects:
       there is no PR CI, so run typecheck/test/build yourself before pushing.
       README.md documents the rules in detail: update it when gameplay changes.
   - repo: briansteffens/bay-area-pirates
+    design_ahead: 8
     preview: pages
     notes: |
       First/third-person boating RPG on a real-terrain San Francisco Bay, in
