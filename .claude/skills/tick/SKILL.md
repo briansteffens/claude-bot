@@ -228,7 +228,10 @@ hourly regardless. Poll faster while things are moving:
   from now. `list_triggers` (recurring: false, enabled: true) to find it; move it
   with `update_trigger` `run_once_at`, or create it with `send_later`
   (`name: "claude-bot next tick"`, message `Run /tick (claude-bot poll).`).
-- If idle: leave the heartbeat to it; don't create a one-shot.
+- If idle: do the same with `idle_poll_minutes` (if set), so a newly labelled
+  issue is picked up within that many minutes instead of waiting for the hourly
+  heartbeat. Only when `idle_poll_minutes` is unset, leave idle periods to the
+  heartbeat.
 - In inline/local mode under `/loop`, skip this step — the loop paces itself.
 
 ## 6. Report

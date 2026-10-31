@@ -162,9 +162,12 @@ projects:
       the features: keep it current.
 
 schedule:
-  # Poll interval while something is waiting on you or in flight. The hourly
-  # heartbeat scheduled task covers idle periods.
+  # Poll interval while something is waiting on you or in flight.
   active_poll_minutes: 10
+  # Poll interval when nothing is in flight, so newly labelled issues are
+  # picked up within this many minutes (the hourly heartbeat is only a
+  # backstop). Omit to rely on the heartbeat alone while idle.
+  idle_poll_minutes: 10
 
 # Keep a "claude-bot queue" issue in this repo with a live table of every
 # project's queue. Handy as a single place to watch progress.
