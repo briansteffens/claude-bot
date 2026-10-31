@@ -142,7 +142,7 @@ projects:
       (designer, architect, developer, code-reviewer, tester); use them where
       they help, e.g. game-tester to play a night before asking for review.
   - repo: briansteffens/factory
-    build_slots: 2
+    build_slots: 4
     design_ahead: 8
     preview: artifact
     notes: |
