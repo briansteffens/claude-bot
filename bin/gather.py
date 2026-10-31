@@ -42,13 +42,23 @@ def save_etag_cache():
 
 
 def gh_paginated(path):
-    result = subprocess.run(["gh", "api", "--paginate", "--slurp", path], capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"gh api {path}: {result.stderr.strip()}")
-    pages = json.loads(result.stdout)
-    if pages and isinstance(pages[0], list):
-        return [item for page in pages for item in page]
-    return pages[0] if len(pages) == 1 else pages
+    # Page by number on the same repos/{owner}/{repo} path: GitHub's Link headers
+    # (which `gh --paginate` follows) use repositories/{id}/..., which the cloud
+    # proxy refuses.
+    per_page = int(re.search(r"[?&]per_page=(\d+)", path).group(1)) if "per_page=" in path else 30
+    items = []
+    for page in range(1, 51):
+        sep = "&" if "?" in path else "?"
+        result = subprocess.run(["gh", "api", f"{path}{sep}page={page}"], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"gh api {path}: {result.stderr.strip()}")
+        data = json.loads(result.stdout)
+        if not isinstance(data, list):
+            return data
+        items.extend(data)
+        if len(data) < per_page:
+            break
+    return items
 
 
 def gh(path):
