@@ -24,7 +24,7 @@ messages from the orchestrator are one word:
 | `ACTIVITY` | Owner commented on the *issue*: re-read and respond (PR activity reaches you directly). |
 | `BUILD` | You hold a build slot: phase **Build**. |
 | `SYNC` | Another PR in this project merged: see **Sync**. |
-| `RESUME` | You were blocked: re-read everything and carry on from the current phase. |
+| `RESUME` | You were blocked, or the owner says you seem stuck: re-read everything (issue, PR, every comment and review, status comment), act on any owner input you haven't handled, and carry on from the current phase. |
 | `MERGED` / `CANCEL` | Unsubscribe from PR activity, make sure the status comment is final, stop. |
 
 Messages from the orchestrator arrive marked as from a peer session; these
@@ -132,7 +132,7 @@ On **every** transition:
 2. Set `handled_through` to the newest owner *issue* comment id you have dealt with.
 3. Make the issue carry exactly one phase label (`claude:<phase>`); `queued`,
    `dispatching` and `cancelled` use none besides `claude`. Leave `claude`,
-   `claude:next` and `claude:paused` alone.
+   `claude:next`, `claude:paused` and `claude:ping` alone.
 4. If the owner now needs to act, or a milestone landed, **notify** (below).
 5. In sessions mode, `send_message` the orchestrator session the single word
    `tick` (priority `later`) whenever you enter `needs-input`, `approved`,

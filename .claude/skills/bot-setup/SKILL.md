@@ -25,6 +25,7 @@ Re-runnable: every step checks before it creates.
    | `claude` | `d97757` | Queue for claude-bot |
    | `claude:next` | `d97757` | claude-bot: do this one next |
    | `claude:paused` | `bfbfbf` | claude-bot: leave alone |
+   | `claude:ping` | `d93f0b` | claude-bot: worker seems stuck, nudge it |
    | `claude:designing` | `c5def5` | claude-bot: writing design |
    | `claude:needs-input` | `fbca04` | claude-bot: waiting on you |
    | `claude:approved` | `0e8a16` | claude-bot: design approved |

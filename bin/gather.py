@@ -120,7 +120,7 @@ def parse_status(comments):
 
 def phase_label(labels):
     phases = [name[len("claude:"):] for name in labels if name.startswith("claude:")]
-    return [p for p in phases if p not in ("next", "paused")]
+    return [p for p in phases if p not in ("next", "paused", "ping")]
 
 
 def infer_review_state(repo, pr_number, owners):
@@ -167,6 +167,7 @@ def describe_issue(repo, issue, owners):
         "phase_labels": phase_label(labels),
         "next": "claude:next" in labels,
         "paused": "claude:paused" in labels,
+        "ping": "claude:ping" in labels,
         "status_comment_id": status_id,
         "status": status,
         "phase": (status or {}).get("phase") or "queued",

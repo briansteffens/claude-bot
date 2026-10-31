@@ -60,7 +60,8 @@ Apply the first matching rule:
 
 | Condition | Action |
 | --- | --- |
-| Label `claude:paused` | Skip entirely. |
+| Label `claude:paused` | Skip entirely (leave any `claude:ping` on it). |
+| Label `claude:ping` | The owner says this worker is stuck (factory ⚡ Unstick); handle these first. `get_session` the worker: if it exists and isn't `failed`, send `RESUME` (priority `next`; unarchive it first if archived). If it's missing or failed, dispatch a fresh worker with directive `RESUME`; with no session yet, dispatch as usual (`DESIGN`). Then remove the label (`gh api -X DELETE repos/<o>/<r>/issues/<n>/labels/claude:ping`), note it in the report, and keep applying the rules below. |
 | Phase `done` / `cancelled` | Nothing. |
 | PR merged, phase not `done` | Finalize as the playbook's "Merged" step describes (status → `done`, label, summary comment, close the issue if still open, notify). Tell the worker `MERGED` so it unsubscribes. Then send `SYNC` to every other `building`/`in-review` worker in the same project: the base moved under them. |
 | Issue closed without a merged PR | Status → `cancelled`, remove `claude:*` phase labels, send worker `CANCEL`. Leave any PR for the owner. |

@@ -249,6 +249,7 @@ def project_state(project, settings):
             "position": position, "repo": project["repo"], "number": issue["number"], "title": issue["title"],
             "url": issue["url"], "phase": issue["phase"], "phase_text": phase_text(issue),
             "review_state": state, "revision": revision, "paused": issue["paused"], "next": issue["next"],
+            "pinged": issue.get("ping", False),
             "pr": pr_of(issue), "preview": preview_of(issue) if issue["phase"] == "in-review" else None,
             "session_url": status.get("session_url"),
             "progress": progress_of(issue),
