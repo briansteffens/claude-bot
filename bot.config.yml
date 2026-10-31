@@ -135,9 +135,8 @@ projects:
       `res://tools/balance_probe.gd` (seconds each). If godot is missing,
       install 4.4-stable the way build.yml does. Never edit build.yml.
       Every push (yours too) runs CI, deploys that branch to
-      https://barmanager.briansf.com (behind Cloudflare Access, one-time PIN)
-      and pings the owner on Slack, so push deliberately: batch fixes, no
-      WIP pushes. The live site is the preview; after merge, the default
+      https://barmanager.briansf.com (behind a login you don't have) and
+      notifies the owner, so push deliberately: batch fixes, no WIP pushes. The live site is the preview; after merge, the default
       branch redeploys. The repo has its own game-* agents in .claude/agents
       (designer, architect, developer, code-reviewer, tester); use them where
       they help, e.g. game-tester to play a night before asking for review.
