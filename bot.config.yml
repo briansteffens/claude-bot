@@ -163,6 +163,22 @@ projects:
       GitHub GraphQL, so GraphQL paths (auto-merge) are tested against the fake
       only: say so in the PR. Cloudflare Pages deploys main. README.md lists
       the features: keep it current.
+  - repo: briansteffens/claude-bot
+    build_slots: 1
+    preview: instructions
+    notes: |
+      This repo: the bot itself (orchestrator skills in .claude/skills/tick and
+      bot-setup, the worker playbook in .claude/skills/work-issue, scripts in
+      bin/ (Python 3, run with -I), bot.config.yml, CLAUDE.md, README.md). The
+      live orchestrator session runs from main and `git pull`s every tick, so a
+      merged change takes effect within minutes: keep changes small and
+      backwards compatible with workers already running on the previous
+      playbook (bin/playbook.py --version changes whenever work-issue does).
+      Don't touch the queue issue (#1) or its dashboard-data comment, don't
+      edit other projects' blocks in bot.config.yml unless the issue asks, and
+      never put secrets in the repo. No test suite: verify scripts by running
+      them (bin/gather.py and bin/dashboard.py work read-only without
+      --write; python3 -m py_compile for syntax) and paste the output.
 
 schedule:
   # Poll interval while something is waiting on you or in flight.
