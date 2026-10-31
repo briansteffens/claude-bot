@@ -63,13 +63,14 @@ defaults:
 projects:
   - repo: briansteffens/minefield-commander
     build_slots: 1
-    preview: artifact
+    preview: pages
     notes: |
       3D Minesweeper in TypeScript + three.js, bundled by esbuild into one
       self-contained HTML file. `npm ci`, then `npm run typecheck`, `npm test`
       (vitest), `npm run build`. The build writes dist/index.html (standalone)
-      and dist/artifact.html (fragment made for Artifact publishing — publish
-      that for the PR preview). Pages deploys main via .github/workflows/pages.yml;
+      and dist/artifact.html (Artifact fragment, no longer used for previews).
+      For the PR preview, push dist/index.html to the `previews` branch as
+      pr-<n>/index.html (the Pages workflow publishes it at /previews/pr-<n>/). Pages deploys main via .github/workflows/pages.yml;
       there is no PR CI, so run typecheck/test/build yourself before pushing.
       README.md documents the rules in detail: update it when gameplay changes.
   - repo: briansteffens/bay-area-pirates
