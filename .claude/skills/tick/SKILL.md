@@ -233,6 +233,13 @@ hourly regardless. Poll faster while things are moving:
   heartbeat. Only when `idle_poll_minutes` is unset, leave idle periods to the
   heartbeat.
 - In inline/local mode under `/loop`, skip this step — the loop paces itself.
+- **New-issue watcher.** Also make sure `bin/watch-new.py` is running as a
+  background Bash task of this session (`run_in_background: true`; start one if
+  none is running). It checks every 30s for open `claude` issues with no phase
+  label and exits the moment it finds one, which re-invokes this session: run
+  `/tick` then (it dispatches them) and start the watcher again. This is what
+  gets a new issue a worker within a minute; the polls and the heartbeat are
+  backstops for when the container was recycled and the watcher died with it.
 
 ## 6. Report
 
