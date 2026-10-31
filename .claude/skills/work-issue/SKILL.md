@@ -280,11 +280,17 @@ footprint and avoid drive-by refactors or reformatting of shared files.
    to `needs-input`.
 4. Run the project's tests, linters and build. Add tests for the change.
 5. **Make it playable** (project `preview` setting):
-   - `artifact` — build a self-contained playable version (single HTML page, or a
-     page plus files) and publish it with the Artifact tool, following that tool's
-     rules. Artifacts are private to the owner by default, which is what we want.
-     Use the same file path on each update so the link stays stable. Record the
-     URL as `preview` in the status JSON.
+   - `artifact` — build a self-contained playable version and publish it with the
+     Artifact tool (same file path each update, so the link stays stable). An
+     Artifact runs inside claude.ai, not a plain browser tab: claude.ai wraps the
+     file in its own page shell (so the file is page content, no <html>/<head>),
+     sets data-theme="dark"/"light" on the root for the viewer's theme choice,
+     opens every link to another site outside the frame, and only carries plain
+     #name hashes in its URL. Play-check it the way claude.ai serves it, never
+     only the raw file: if the repo has an artifact check (e.g.
+     `npm run check:artifact`), run it; otherwise load the page wrapped in that
+     shell inside a sandboxed iframe, with data-theme set both ways, and click
+     through the links the owner will use. Record the URL as `preview`.
    - `pages` — push the build to the `gh-pages` branch under `previews/pr-<n>/` and
      link `https://<owner>.github.io/<repo>/previews/pr-<n>/`.
    - `instructions` — exact copy-paste commands to run it, plus captured output.
@@ -295,8 +301,9 @@ footprint and avoid drive-by refactors or reformatting of shared files.
      `preview_url` as `preview`, and in the PR's "Try it" say which commit is
      live. If it failed, fix it (or report an infra hiccup) before asking for
      review. Every later push redeploys, so wait again before saying "updated".
-   - Whatever the mode, **actually run it**: load it in headless Chromium with
-     Playwright (pre-installed in cloud sessions), exercise the new behaviour,
+   - Whatever the mode, **actually run it** in the environment the owner will use
+     it in (for `artifact`, as claude.ai serves it): load it in headless Chromium
+     with Playwright (pre-installed in cloud sessions), exercise the new behaviour,
      check the console for errors. Fix what you find before asking for review.
 6. Remove `.claude-bot/design-<n>.md` (or move it, per `design_doc`). Commit with a
    clear message and push.
