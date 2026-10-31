@@ -48,7 +48,9 @@ defaults:
   merge: manual
   # How to make the change playable from the PR:
   #   artifact     - publish a playable build as a private claude.ai Artifact and link it
-  #   pages        - push the build to gh-pages under previews/pr-<n>/ and link it
+  #   pages        - push the build to the `previews` branch under pr-<n>/; the
+  #                  repo's Pages workflow publishes it at
+  #                  <owner>.github.io/<repo>/previews/pr-<n>/ (see README)
   #   instructions - exact commands to run it locally, plus captured output/screenshots
   #   deploy       - CI deploys every pushed branch to `preview_url`; the worker
   #                  waits for the deploy of its commit, then links that URL

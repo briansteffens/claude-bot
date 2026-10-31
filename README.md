@@ -157,7 +157,20 @@ click or GitHub's auto-merge enforcing rules you set.
 
 - `artifact` — the worker publishes a playable build as a claude.ai Artifact (private
   to you) and links it from the PR. Best for browser games and web UIs.
-- `pages` — builds go to `gh-pages` under `previews/pr-<n>/`.
+- `pages` — the worker pushes the build to the `previews` branch under `pr-<n>/` and
+  links `https://<owner>.github.io/<repo>/previews/pr-<n>/`: a plain public page, no
+  claude.ai wrapper, so it plays full-screen, on a phone and in the factory app's
+  preview pane. Needs nothing in any settings page, only a Pages workflow
+  (Source: "GitHub Actions") that:
+  - deploys main's build at the root with the `previews` branch's contents copied
+    under `previews/`, so every deploy carries every open PR's preview;
+  - also runs when `previews` is pushed. The `github-pages` environment only
+    accepts deploys from the default branch, so don't trigger on that push
+    directly: a tiny workflow runs on `push: branches: [previews]`, and the Pages
+    workflow listens for it with `on: workflow_run`, which runs as the default
+    branch.
+
+  Merged and closed PRs' folders are deleted from `previews` when the bot finalizes.
 - `instructions` — copy-paste run commands plus captured output.
 
 In every mode the worker loads the build in headless Chromium with Playwright and

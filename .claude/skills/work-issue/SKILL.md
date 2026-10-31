@@ -291,8 +291,23 @@ footprint and avoid drive-by refactors or reformatting of shared files.
      `npm run check:artifact`), run it; otherwise load the page wrapped in that
      shell inside a sandboxed iframe, with data-theme set both ways, and click
      through the links the owner will use. Record the URL as `preview`.
-   - `pages` — push the build to the `gh-pages` branch under `previews/pr-<n>/` and
-     link `https://<owner>.github.io/<repo>/previews/pr-<n>/`.
+   - `pages` — the repo's GitHub Pages workflow publishes main at the site root
+     and the `previews` branch under `/previews/` (README "Playable previews").
+     Put only the built files in `pr-<n>/` on the `previews` branch: a separate
+     checkout (`git worktree add`, or create the branch with `--orphan` if it
+     doesn't exist yet), replace that folder, commit, push. Touch no other folder;
+     other workers share the branch, so on a rejected push fetch, rebase and push
+     again. Write the head commit's SHA into `pr-<n>/preview-version.txt` so you
+     can tell which build is live. Then wait (use `send_later`, don't block) for
+     the Pages deploy run that your push starts and for
+     `https://<owner>.github.io/<repo>/previews/pr-<n>/preview-version.txt` to
+     show your SHA (owner lowercased). Only then is the preview ready: record
+     `https://<owner>.github.io/<repo>/previews/pr-<n>/` as `preview`, play-check
+     it at that URL, and in "Try it" say which commit is live. If the deploy
+     failed, fix it (or report an infra hiccup) before asking for review. Every
+     later push to the PR means rebuilding and replacing the folder, then waiting
+     again before saying "updated". Previews are public pages: say so if an
+     issue looks like it shouldn't be.
    - `instructions` — exact copy-paste commands to run it, plus captured output.
    - `deploy` — the project's CI deploys whatever branch was pushed to a fixed
      URL (`preview_url`). After pushing, find the workflow run for your head
@@ -393,6 +408,8 @@ When the PR merges (PR event, `MERGED`, or you notice it):
 2. Post a short wrap-up on the issue: what shipped, anything deferred, suggested
    follow-ups (as bullets — don't open new issues unless an owner asked).
 3. Close the issue (reason: completed) if `Closes #n` didn't.
+   With `preview: pages`, also delete `pr-<n>/` from the `previews` branch (one
+   commit, rebase and retry if the push is rejected).
 4. `unsubscribe_pr_activity`, notify (`my-game#12 merged — next up #15`), ping the
    orchestrator `tick`.
 

@@ -64,7 +64,7 @@ Apply the first matching rule:
 | Label `claude:ping` | The owner says this worker is stuck (factory ⚡ Unstick); handle these first. `get_session` the worker: if it exists and isn't `failed`, send `RESUME` (priority `next`; unarchive it first if archived). If it's missing or failed, dispatch a fresh worker with directive `RESUME`; with no session yet, dispatch as usual (`DESIGN`). Then remove the label (`gh api -X DELETE repos/<o>/<r>/issues/<n>/labels/claude:ping`), note it in the report, and keep applying the rules below. |
 | Phase `done` / `cancelled` | Nothing. |
 | PR merged, phase not `done` | Finalize as the playbook's "Merged" step describes (status → `done`, label, summary comment, close the issue if still open, notify). Tell the worker `MERGED` so it unsubscribes. Then send `SYNC` to every other `building`/`in-review` worker in the same project: the base moved under them. |
-| Issue closed without a merged PR | Status → `cancelled`, remove `claude:*` phase labels, send worker `CANCEL`. Leave any PR for the owner. |
+| Issue closed without a merged PR | Status → `cancelled`, remove `claude:*` phase labels, send worker `CANCEL`. Leave any PR for the owner, but with `preview: pages` delete its `pr-<n>/` from the `previews` branch once that PR is closed. |
 | Phase `dispatching` with no session id | A previous tick died mid-dispatch: `list_sessions` with tag `claude-bot:<repo>#<n>`; adopt a match, otherwise dispatch again. |
 | Worker `status_bucket` = `failed`, or session missing | Status → `blocked` with the reason, notify the owner. Owner can reply "retry" to get a fresh worker. |
 | Phase `blocked` and an unhandled owner comment says retry/continue | Dispatch a fresh worker with directive `RESUME` (reuse the session if it still exists). |

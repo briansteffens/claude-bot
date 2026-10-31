@@ -46,7 +46,9 @@ Re-runnable: every step checks before it creates.
    - `merge: auto-merge` → repo has "Allow auto-merge" on and the default branch
      has a protection rule (required review and/or checks); otherwise auto-merge
      can't be enabled.
-   - `preview: pages` → GitHub Pages serves the `gh-pages` branch.
+   - `preview: pages` → the repo's Pages workflow also publishes the `previews`
+     branch under `/previews/`, and a push to `previews` alone redeploys (README
+     "Playable previews"). If not, suggest the owner queue an issue for it.
    - The default branch's CI is green (a red base blocks every PR).
 
 6. **Heartbeat (sessions mode).** `list_triggers` and look for `claude-bot heartbeat`.
