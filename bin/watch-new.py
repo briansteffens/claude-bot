@@ -47,7 +47,10 @@ def queued(repo):
         labels = {label["name"] for label in issue["labels"]}
         if "claude:paused" in labels or labels - QUIET:
             continue
-        found.append(f"{repo}#{issue['number']} {issue['title']}")
+        # A ping on a queued issue means "start it now": report it as new even
+        # if it was already queued when the watcher started.
+        tag = " (ping)" if "claude:ping" in labels else ""
+        found.append(f"{repo}#{issue['number']} {issue['title']}{tag}")
     return found
 
 
