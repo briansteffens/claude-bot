@@ -143,6 +143,7 @@ projects:
       they help, e.g. game-tester to play a night before asking for review.
   - repo: briansteffens/factory
     build_slots: 2
+    design_ahead: 8
     preview: artifact
     notes: |
       The software factory web app: the claude-bot dashboard on the left, PRs,
