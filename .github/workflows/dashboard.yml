@@ -1,0 +1,39 @@
+# Refreshes the dashboard on the queue issue. Started by factory's Worker
+# (workflow_dispatch) when a webhook says something changed, while the factory
+# app is open; see briansteffens/factory docs/live-updates.md.
+name: dashboard
+on: workflow_dispatch
+# One run at a time; GitHub keeps at most one more queued, which is the debounce we want.
+concurrency:
+  group: dashboard
+  cancel-in-progress: false
+permissions:
+  contents: read
+  issues: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install --quiet pyyaml
+      # publish_data compares with the last published data in ~/.cache/claude-bot.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/claude-bot
+          key: claude-bot-cache-${{ github.run_id }}
+          restore-keys: claude-bot-cache-
+      - uses: actions/create-github-app-token@v1
+        id: app
+        with:
+          app-id: ${{ secrets.DASHBOARD_APP_ID }}
+          private-key: ${{ secrets.DASHBOARD_APP_KEY }}
+          owner: ${{ github.repository_owner }}
+      # Read every project with the App's read-only token...
+      - run: bin/gather.py bot.config.yml > "$RUNNER_TEMP/snapshot.json"
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+      # ...and write the queue issue with this repo's own token. Prints one line.
+      - run: bin/dashboard.py --write "$RUNNER_TEMP/snapshot.json"
+        env:
+          GH_TOKEN: ${{ github.token }}
