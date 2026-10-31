@@ -213,9 +213,11 @@ def notes_for(issue, slots_full, holders):
     status = issue.get("status") or {}
     if issue["paused"]:
         return "paused"
-    if PLAYBOOK and status.get("session") and status.get("playbook") != PLAYBOOK and issue["phase"] in (
+    # Only workers that predate playbook versioning are worth flagging: they
+    # can't report progress. Any versioned playbook can.
+    if PLAYBOOK and status.get("session") and not status.get("playbook") and issue["phase"] in (
             "designing", "needs-input", "approved", "building", "in-review"):
-        older = "older playbook (no progress reports)" if not status.get("playbook") else "older playbook"
+        older = "older playbook (no progress reports)"
         rest = notes_for({**issue, "status": {**status, "playbook": PLAYBOOK}}, slots_full, holders)
         return f"{rest} · {older}" if rest else older
     if issue["phase"] in HOLDING:
