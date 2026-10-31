@@ -142,8 +142,7 @@ projects:
       (designer, architect, developer, code-reviewer, tester); use them where
       they help, e.g. game-tester to play a night before asking for review.
   - repo: briansteffens/factory
-    # Owner: build factory issues strictly in order, one at a time.
-    build_slots: 1
+    build_slots: 2
     preview: artifact
     notes: |
       The software factory web app: the claude-bot dashboard on the left, PRs,
