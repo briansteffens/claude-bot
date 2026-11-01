@@ -1,5 +1,7 @@
 # Design: size estimates and a small-issue build slot (#3)
 
+Status: approved (owner took every default: 1 L-only hold, M counts as small; 2 `designing` holds the slot, `needs-input` doesn't; 3 `claude:next` overrides; 4 `small_slot` setting, default true).
+
 ## Goal
 Stop large issues from filling every build slot while quick ones pile up: workers
 estimate size, and the tick keeps one slot for small/medium work when there are 2+ slots.
