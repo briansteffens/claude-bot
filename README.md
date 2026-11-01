@@ -39,6 +39,11 @@ type into, while GitHub issues stay the main interface.
   the same HUD code wait their turn. When one PR merges, the other worker merges
   the new base, re-checks and refreshes its preview. (`build_slots: 1` makes it
   strictly sequential; `build_scope: global` shares the slots across repos.)
+- **A slot for quick issues.** Workers estimate each build (S ≤ 15 min, M 15–30,
+  L over 30) and the dashboard shows it. With 2+ slots, the last free slot isn't
+  given to a large build while a small or medium issue is approved or still being
+  designed, so quick fixes don't pile up behind long builds. `claude:next`
+  overrides it; `small_slot: false` turns it off for a project.
 - **Design only when it's worth it.** With `design_stage: auto` the worker skips
   the design round for straightforward issues (posting its plan and assumptions on
   the issue so you can object) and goes straight to building. Issues with real

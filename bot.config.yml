@@ -34,6 +34,11 @@ defaults:
   # what's already in progress, e.g. a music change next to a creature-AI
   # change, or a UI bug fix next to a new biome. 1 = strictly sequential.
   build_slots: 2
+  # With 2+ build slots, keep the last free slot for small and medium issues
+  # (worker estimate 30 min or less) while any are approved or being designed,
+  # so large builds can't fill every slot while quick issues pile up.
+  # `claude:next` on a large issue overrides it. false = plain queue order.
+  small_slot: true
   # The design is committed on the PR branch as .claude-bot/design-<n>.md.
   # drop - delete it in the build commit; keep - move it to docs/designs/.
   design_doc: drop

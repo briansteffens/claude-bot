@@ -86,10 +86,36 @@ slots are shared by all projects instead. An issue in phase `building` or
    parallelism check below, then send `BUILD` to the first candidate in queue order
    that it clears. Skipping ahead of an incompatible queue head is fine and
    expected: that's the point of the second slot. If none is cleared, leave the
-   slot empty.
+   slot empty. Apply the small-issue rule below when picking.
 4. **Design ahead.** Count issues in `dispatching`/`designing`/`needs-input`/`approved`.
    While that count is below `design_ahead`, take the next `queued` issue in queue
    order and dispatch it with directive `DESIGN`.
+
+### Small-issue slot
+
+Workers record `estimate.size` (`S` ≤ 15 min, `M` 15–30, `L` over 30) in the
+status JSON. With `build_slots` ≥ 2 and `small_slot` on (the default), don't let
+large builds take every slot while quick issues wait:
+
+- When exactly **one** slot is free, it doesn't go to an `L` candidate while a
+  non-`L` issue is *waiting*: approved, or in `designing` (its worker is heading
+  for `approved`). Give it to the first non-`L` candidate in queue order that the
+  parallelism check clears; if there's none yet, leave the slot free this tick.
+- Issues in `needs-input` don't count as waiting: they can sit on the owner for
+  hours.
+- `claude:next` on an `L` candidate overrides the rule: the owner asked for it.
+- With two or more free slots, hand them out as usual; only the last one is kept.
+- Holders count as occupied whatever their size, `in-review` ones included: the
+  rule only looks at free slots.
+- `build_slots: 1` or `small_slot: false`: plain queue order, no reservation.
+- **Missing estimate** (workers on older playbooks): the parallelism subagent
+  estimates it (below) and you record it as `estimate` with `"by": "orchestrator"`.
+  If there's still none, treat the issue as `M`.
+
+When you hold a candidate back this way, record it in its status JSON as
+`"slot_hold": {"for": [<waiting non-L issue numbers>], "at": "<UTC>"}` and remove
+`slot_hold` once it gets `BUILD` or nothing is held back anymore; the dashboard
+shows it.
 
 Never exceed the slot count. Never dispatch the same issue twice — check the status
 comment again right before dispatching or sending `BUILD`.
@@ -100,7 +126,9 @@ Only run it when a slot is free and there is at least one candidate, and reuse a
 verdict while it's still valid: each candidate's status JSON keeps the last result
 as `"parallel": {"with": [<holder issue numbers>], "ok": true|false, "reason": "...",
 "checked": "<UTC>"}`. Re-check only if the holder set changed, or a holder pushed
-new commits since `checked` (its real diff is better evidence than its plan).
+new commits since `checked` (its real diff is better evidence than its plan),
+or the small-issue rule needs a size that a candidate, or a waiting `designing`
+issue, doesn't have yet.
 
 Spawn one subagent (Agent tool, `general-purpose`) for all candidates at once, so
 the analysis stays out of this session's context:
@@ -129,9 +157,14 @@ A candidate is parallel-safe with a holder when:
   depends on (a refactor of a shared module conflicts with nearly everything).
 When unsure, say not safe.
 
+Also estimate the build time for these issues, which have no size estimate yet:
+<issue numbers, or "none">. Minutes = an agent's time to implement, test and
+preview it; size S <= 15, M 15-30, L > 30.
+
 Reply with only JSON:
 {"candidates":[{"issue":<n>,"ok":true|false,"conflicts_with":[<holder n>],
-"shared_files":["path"],"reason":"one sentence"}]}
+"shared_files":["path"],"reason":"one sentence"}],
+"estimates":[{"issue":<n>,"size":"S|M|L","minutes":<n>,"why":"few words"}]}
 ```
 
 Write each verdict into that candidate's status JSON (`parallel`), and mention a
@@ -213,7 +246,8 @@ What it shows (so you know what to keep in the status JSON): "Needs you" rows fo
 (recorded `review_state`, or inferred from PR activity for older workers), with PR
 and preview links (`preview`, else the PR body's "Try it" link) and the
 revision; "In progress" per project with slots, phases and the parallelism
-verdicts from each issue's `parallel` (`reason` when not safe); and "Recently
+verdicts from each issue's `parallel` (`reason` when not safe), each issue's
+`estimate` next to its title and any `slot_hold` in its notes; and "Recently
 merged" with PR comment counts. To change the layout, edit `bin/dashboard.py`.
 
 ## 5. Schedule the next tick

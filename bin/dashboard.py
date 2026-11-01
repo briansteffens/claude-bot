@@ -197,6 +197,28 @@ def phase_text(issue):
     return text + progress if phase in ("designing", "building") else text
 
 
+SIZES = ("S", "M", "L")
+
+
+def estimate_of(issue):
+    """The size estimate from the status JSON (worker's, or the orchestrator's
+    for older workers), or None when there is none yet."""
+    estimate = (issue.get("status") or {}).get("estimate") or {}
+    size = str(estimate.get("size") or "").upper()
+    if size not in SIZES:
+        return None
+    minutes = estimate.get("minutes")
+    return {"size": size, "minutes": minutes if isinstance(minutes, (int, float)) else None,
+            "by": estimate.get("by") or "worker"}
+
+
+def estimate_text(estimate):
+    if not estimate:
+        return ""
+    minutes = f" ~{round(estimate['minutes'])}m" if estimate["minutes"] is not None else ""
+    return f" · {estimate['size']}{minutes}"
+
+
 def playbook_version():
     try:
         sys.path.insert(0, HERE)
@@ -224,6 +246,10 @@ def notes_for(issue, slots_full, holders):
         return "slot"
     if issue["phase"] != "approved":
         return ""
+    hold = status.get("slot_hold") or {}
+    if hold and not slots_full:
+        waiting = ", ".join(f"#{n}" for n in hold.get("for") or [])
+        return f"waiting: last slot kept for small issues ({waiting})" if waiting else "waiting: last slot kept for small issues"
     parallel = status.get("parallel") or {}
     if parallel.get("ok") is False and parallel.get("reason"):
         return f"waiting: {parallel['reason']}"
@@ -253,6 +279,7 @@ def project_state(project, settings):
             "pr": pr_of(issue), "preview": preview_of(issue) if issue["phase"] == "in-review" else None,
             "session_url": status.get("session_url"),
             "progress": progress_of(issue),
+            "estimate": estimate_of(issue),
             "notes": notes_for(issue, slots["used"] >= slots["total"], holders),
         })
     return slots, items
@@ -272,7 +299,8 @@ def project_section(project, settings, today):
         preview = item["preview"]
         session = link("open", item["session_url"]) if item["session_url"] else "—"
         lines.append(
-            f"| {item['position']} | {link('#' + str(item['number']), item['url'])} {item['title']} | {item['phase_text']} | {pr_cell} "
+            f"| {item['position']} | {link('#' + str(item['number']), item['url'])} {item['title']}{estimate_text(item['estimate'])} "
+            f"| {item['phase_text']} | {pr_cell} "
             f"| {link('▶️', preview) if preview else '—'} | {session} | {item['notes']} |"
         )
     lines.append("")
@@ -323,7 +351,7 @@ def model(snapshot):
         slots, items = project_state(project, settings)
         sections.append({
             "repo": project["repo"], "slots": slots, "issues": items,
-            "settings": {key: settings.get(key) for key in ("merge", "preview", "preview_url", "design_venue", "build_slots")},
+            "settings": {key: settings.get(key) for key in ("merge", "preview", "preview_url", "design_venue", "build_slots", "small_slot")},
         })
     return {
         "version": 1,

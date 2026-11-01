@@ -51,7 +51,7 @@ The status comment on the issue (id in the brief) is the single record of this
 issue. Its body:
 
 ```
-<!-- claude-bot:status {"phase":"needs-input","session":"session_...","session_url":"https://claude.ai/code/session_...","branch":"claude/issue-12-add-jump","pr":31,"design":"pr","design_rev":1,"footprint":{"files":["src/audio/music/**","src/world/biomes.ts (music field only)","src/main.ts (menu slider)"],"systems":["music","settings menu"]},"handled_through":123456789,"updated":"2026-10-30T14:02Z"} -->
+<!-- claude-bot:status {"phase":"needs-input","session":"session_...","session_url":"https://claude.ai/code/session_...","branch":"claude/issue-12-add-jump","pr":31,"design":"pr","design_rev":1,"footprint":{"files":["src/audio/music/**","src/world/biomes.ts (music field only)","src/main.ts (menu slider)"],"systems":["music","settings menu"]},"estimate":{"size":"M","minutes":25,"why":"new music module + one menu slider"},"handled_through":123456789,"updated":"2026-10-30T14:02Z"} -->
 ### 🤖 claude-bot · ❓ Waiting for your input on #31
 
 - [x] Queued
@@ -122,6 +122,22 @@ orchestrator decides that from footprints, so keep it honest:
   *before* making that change and ping the orchestrator `tick`, so it can re-check
   the parallel build.
 
+`estimate` is how long you expect the build to take, so the orchestrator can
+keep large builds from filling every slot while quick issues wait:
+
+```json
+"estimate": {"size": "M", "minutes": 25, "why": "new music module + one menu slider"}
+```
+
+- `minutes` is your working time from `BUILD` to "PR ready" (implement, test,
+  build, preview, play-check), not the owner's review time.
+- `size` follows from it: **S** ≤ 15 minutes, **M** 15–30, **L** over 30.
+- `why` is a few words on what drives it.
+- Write a first guess in Triage (issues still in design need one too), refine it
+  when you enter `approved`, and revise it during Build if the work turns out
+  much bigger, like the footprint. Be honest: an L that claims M takes the slot
+  kept for small issues.
+
 Phases: `dispatching` → `designing` → (`needs-input` ⇄ `designing`) → `approved` →
 `building` → `in-review` → `done`, plus `blocked` and `cancelled`.
 
@@ -168,7 +184,8 @@ on.
 ## Phase: Triage
 
 Set phase `designing` with `progress` at `0/4` (see Progress), read the issue and enough of the codebase to know what the
-change involves, then decide whether a design discussion is worth the owner's time.
+change involves, write a first `estimate` (see State), then decide whether a
+design discussion is worth the owner's time.
 
 **Skip it (fast path)** when all of these hold — and `design_stage` is `auto`:
 
@@ -187,7 +204,7 @@ Looks straightforward, so I'll skip the design round and go straight to a PR.
 **Assumptions:** the defaults I'm picking (say if you want otherwise).
 ```
 
-— record `design: "skipped"` and the `footprint`, set phase `approved`, and wait for `BUILD`. If the
+— record `design: "skipped"`, the `footprint` and the `estimate`, set phase `approved`, and wait for `BUILD`. If the
 owner objects before then, treat it like design feedback (open a design PR).
 
 **Otherwise** (questions that matter, several real approaches, a big or risky change,
@@ -237,7 +254,7 @@ start on a first draft; no separate approval needed.
    preview (see Build step 5) and link it.
 3. `subscribe_pr_activity` for the PR. From here, owner comments and reviews on
    the PR wake you directly.
-4. Comment on the issue: `Design discussion: #<pr>` (one line). Record `pr` and the
+4. Comment on the issue: `Design discussion: #<pr>` (one line). Record `pr`, the `estimate` and the
    `footprint`, set `design: "pr"`, phase `needs-input`, notify.
 
 ### Handling owner feedback (PR comments, reviews, issue comments)
@@ -247,8 +264,9 @@ free-form:
 
 - **Answers that settle every open question, with nothing left unclear** → that
   *is* approval; don't ask for an explicit "approve". Fold the answers into the
-  design file and PR body, reply briefly with what you'll build, set phase
-  `approved` (label `claude:approved`) and go on to the first draft.
+  design file and PR body, reply briefly with what you'll build, refresh the
+  `estimate` from the settled design, set phase `approved` (label
+  `claude:approved`) and go on to the first draft.
 - Explicit approval ("approve", "lgtm", "go", "ship it", an approving review, or
   label `claude:approved`) with no outstanding objection → the same.
 - Answers that leave something genuinely unclear (an answer contradicts the
