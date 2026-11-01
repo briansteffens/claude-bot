@@ -174,8 +174,11 @@ def describe_issue(repo, issue, owners):
         "unhandled_owner_issue_comments": owner_comments,
     }
     pr_number = (status or {}).get("pr")
+    # A PR can live in another repo than its issue (e.g. a factory issue whose
+    # change lands in claude-bot); the status JSON then names it as pr_repo.
+    pr_repo = (status or {}).get("pr_repo") or repo
     if pr_number:
-        pr = gh(f"repos/{repo}/pulls/{pr_number}")
+        pr = gh(f"repos/{pr_repo}/pulls/{pr_number}")
         entry["pr"] = {
             "number": pr_number,
             "url": pr["html_url"],
@@ -192,7 +195,7 @@ def describe_issue(repo, issue, owners):
             link = re.search(r"https?://[^\s)>\]]+", body[heading:heading + 600])
             entry["pr"]["try_it_url"] = link.group(0) if link else None
         if entry["phase"] == "in-review" and pr["state"] == "open" and not (status or {}).get("review_state"):
-            entry["pr"].update(infer_review_state(repo, pr_number, owners))
+            entry["pr"].update(infer_review_state(pr_repo, pr_number, owners))
     return entry
 
 
@@ -219,13 +222,14 @@ def merged_pr_stats(repo, issue_number, owners, cache):
         return cache[key]
     _, status = parse_status(gh(f"repos/{repo}/issues/{issue_number}/comments?per_page=100"))
     pr_number = (status or {}).get("pr")
+    pr_repo = (status or {}).get("pr_repo") or repo
     if not pr_number:
         stats = {"pr": None}
     else:
-        pr = gh(f"repos/{repo}/pulls/{pr_number}")
-        conversation = gh(f"repos/{repo}/issues/{pr_number}/comments?per_page=100")
-        inline = gh(f"repos/{repo}/pulls/{pr_number}/comments?per_page=100")
-        reviews = [r for r in gh(f"repos/{repo}/pulls/{pr_number}/reviews?per_page=100") if (r.get("body") or "").strip()]
+        pr = gh(f"repos/{pr_repo}/pulls/{pr_number}")
+        conversation = gh(f"repos/{pr_repo}/issues/{pr_number}/comments?per_page=100")
+        inline = gh(f"repos/{pr_repo}/pulls/{pr_number}/comments?per_page=100")
+        reviews = [r for r in gh(f"repos/{pr_repo}/pulls/{pr_number}/reviews?per_page=100") if (r.get("body") or "").strip()]
         everything = conversation + inline + reviews
 
         def from_owner(c):
