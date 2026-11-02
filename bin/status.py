@@ -175,7 +175,7 @@ def rebuild(body, status, phase_changed=False, notes=()):
     if phase_changed:
         lines = [heading(status) if line.startswith("### 🤖 claude-bot") else line for line in lines]
         if status.get("phase") == "done":
-            lines = [re.sub(r"^- \[ \] (Merged|Built)", r"- [x] \1", line) for line in lines]
+            lines = [re.sub(r"^- \[ \] (Merged|Built|Ready to build|Design discussion)", r"- [x] \1", line) for line in lines]
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     lines = [re.sub(r"Updated \d{4}-\d\d-\d\d \d\d:\d\d UTC", f"Updated {stamp}", line) for line in lines]
     if status.get("session_url"):

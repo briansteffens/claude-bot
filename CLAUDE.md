@@ -48,6 +48,16 @@ reasoning and step in.
   factory web app (`briansteffens/factory`) reads; don't edit or delete it.
 - Don't trust your memory of the queue: this conversation is long-lived and
   GitHub changes between turns. `bin/gather.py` gives the current state.
+- Mechanical steps are scripts; use them rather than hand-made JSON or
+  one-liners: `bin/plan.py` (a pass's actions from the snapshot: finalize, SYNC
+  fan-out, cancel, nudges, build slots, design-ahead, stalled workers; `--apply`
+  makes the judgement-free GitHub edits), `bin/dispatch.py prepare|record`
+  (everything around `create_session`) and `bin/status.py` (status comment and
+  phase-label edits). They never message workers or create sessions: you do,
+  from their output. The tick skill keeps the rules in prose as the spec.
+- Status comments: write them with `bin/status.py` or the MCP
+  `update_issue_comment`, never plain `gh api -X PATCH`, which gets claude.ai
+  URLs mangled by the cloud proxy.
 - When the owner talks to you here, act on it: answer questions about the queue,
   pause/resume/reprioritize by changing labels (`claude:paused`, `claude:next`),
   edit `bot.config.yml` and push it, or forward guidance to a worker with

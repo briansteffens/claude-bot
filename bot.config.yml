@@ -74,6 +74,12 @@ defaults:
   # issue - design discussions happen in issue comments, with no branch pushed
   #         until the build; for repos where any push redeploys something.
   design_venue: pr
+  # How workers get their playbook (.claude/skills/work-issue/SKILL.md):
+  #   fetch  - a ~3 KB loader in the worker's system prompt pins the playbook to
+  #            the current commit of this repo; the worker downloads it, checks
+  #            its version hash and follows it. Keeps dispatch cheap.
+  #   inline - the whole ~27 KB playbook goes in the system prompt, as before.
+  playbook_delivery: fetch
 
 projects:
   - repo: briansteffens/minefield-commander

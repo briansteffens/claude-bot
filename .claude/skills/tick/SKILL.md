@@ -28,7 +28,7 @@ conversation is long-lived; issues get labelled, commented on and merged between
 passes, and anything you recall from an earlier pass may be stale. Run:
 
 ```bash
-bin/gather.py > /tmp/claude-bot-snapshot.json
+mkdir -p /tmp/claude-bot && bin/gather.py > /tmp/claude-bot/snapshot.json
 ```
 
 It lists, per project, every open issue labelled `claude` (including ones with no
@@ -49,6 +49,42 @@ Then, in `sessions` mode, for each issue whose status has a `session`,
 `get_session` it and note `status_bucket` (working / blocked / review_ready /
 completed / failed).
 
+Then work out the pass's actions with **`bin/plan.py`**:
+
+```bash
+bin/plan.py /tmp/claude-bot/snapshot.json > /tmp/claude-bot/plan.json
+```
+
+It implements the rules in sections 2 and 3 below (the reconcile table, build
+slots, quick slot, small-issue rule, parallel-verdict staleness, design-ahead)
+and prints, per project: `finalize`, `sync`, `cancel`, `ping`, `adopt`,
+`retry`, `nudge`, `build`, `needs_parallel_check`, `needs_estimate`, `hold` /
+`clear_hold`, `dispatch` and `stalled`. Sections 2 and 3 stay the spec: if its
+output contradicts them, trust the spec, act by hand and say so in the report
+(and fix the script, or open an issue). If it fails, do the pass by hand from
+the rules as before.
+
+The order of a pass with the script:
+
+1. `bin/plan.py <snapshot>`. If `needs_parallel_check` is set, run the
+   parallelism subagent for those holders and candidates (and the
+   `needs_estimate` issues), record each verdict with
+   `bin/status.py patch <o/r#n> --set 'parallel={...}'` (include `heads`:
+   each holder's PR head SHA from the output, so a later push makes it stale)
+   and any estimate with `--set 'estimate={..., "by": "orchestrator"}'`, then run
+   `bin/plan.py` again on a fresh snapshot.
+2. `bin/plan.py <snapshot> --apply`: makes the judgement-free GitHub edits
+   (finalize → `done` + close, cancel → `cancelled`, `slot: "quick"` and
+   `slot_hold` on build picks and holds). Its `applied` list says what changed;
+   `build` items it `skipped` changed phase since the snapshot: don't BUILD them.
+3. Send the messages it lists: `MERGED` to `finalize` workers, `SYNC` to `sync`,
+   `CANCEL` to `cancel`, `BUILD` to `build`, `ACTIVITY` to `nudge` (unless that
+   worker's `status_bucket` is `working`). The wrap-up comment after a merge is
+   the worker's (on `MERGED`); post one yourself only if the worker is gone.
+4. Handle `ping`, `adopt`, `retry` and `stalled` yourself (rules below):
+   these need a session lookup or judgement.
+5. Dispatch each `dispatch` issue (see "Dispatching a worker").
+
 Comments and reviews on an issue's PR (draft design PR or build PR) go straight to
 the worker through its PR subscription, so they're not in the snapshot — except in
 inline mode, where nothing is subscribed: there, also read owner PR
@@ -56,7 +92,8 @@ comments/reviews newer than the bot's last comment on that PR.
 
 ## 2. Reconcile each issue
 
-Apply the first matching rule:
+`bin/plan.py` applies this table; it's here as the spec. Apply the first
+matching rule:
 
 | Condition | Action |
 | --- | --- |
@@ -73,7 +110,10 @@ Apply the first matching rule:
 
 ## 3. Build slots and dispatch
 
-Each project has `build_slots` slots (default 2); with `build_scope: global` the
+`bin/plan.py` implements this section too (`build`, `hold`,
+`needs_parallel_check`, `dispatch`); it checks verdicts against every holder,
+quick ones included, so a verdict recorded against regular holders only is
+re-checked once. Each project has `build_slots` slots (default 2); with `build_scope: global` the
 slots are shared by all projects instead. An issue in phase `building` or
 `in-review` holds a slot until its PR merges or it's cancelled.
 
@@ -204,6 +244,37 @@ this tick.
 
 ### Dispatching a worker (sessions mode)
 
+With `bin/dispatch.py` (the normal way):
+
+1. `bin/dispatch.py prepare <owner>/<repo>#<n> --orchestrator <this session id>
+   [--directive RESUME] [--redispatch] [--notes FILE]`. It posts (or updates) the
+   status comment (`phase: "dispatching"`, `handled_through`, `run`), adds
+   `claude:designing`, resolves the model from the issue's labels as they are
+   now (`bin/run_config.py`), and prints the `create_session` arguments as JSON:
+   `source_url`, `title`, `tags`, `outcome_branch`, `model` (only when a label
+   set one), `prompt` (the brief) and `append_system_prompt`. Its stderr line
+   lists any `run` notes. It refuses an issue whose status already names a
+   session unless given `--redispatch` (fresh worker for a `blocked` issue or a
+   dead one after `claude:ping`; the phase is left as is). Put your own notes for
+   the worker (overlapping PRs, dependencies, likely files) in a file and pass
+   `--notes`: they're appended to the brief.
+2. `create_session` with exactly those arguments: copy each value as printed,
+   change nothing. Omit `model` when it isn't in the output.
+3. `bin/dispatch.py record <owner>/<repo>#<n> <session id>`: writes `session`,
+   `session_url` and `run` (plus `⚠️ Run:` note lines) into the status comment,
+   keeping whatever phase the worker has already reached.
+
+`append_system_prompt` is a ~3 KB loader (`bin/playbook.py --stub`), not the
+27 KB playbook: it pins the playbook to the current pushed commit of this repo,
+tells the worker to fetch it from raw.githubusercontent.com, check its version
+hash and follow it with system-prompt authority, and repeats the core trust
+rules. `playbook_delivery: inline` in `bot.config.yml` (globally or per
+project) puts the full playbook back, as before. The loader needs this
+checkout's HEAD to be pushed: `git pull` at the start of the tick keeps it so,
+and `prepare` refuses (exit 1) if it isn't.
+
+By hand (if the script fails, or isn't there):
+
 1. Post the status comment (template in the work-issue skill) with
    `phase: "dispatching"`, `handled_through` = id of the latest owner comment that
    is already in the issue (0 if none), and add label `claude:designing`.
@@ -227,22 +298,40 @@ this tick.
    - `tags`: `["claude-bot", "claude-bot:<owner>/<repo>#<n>"]`
    - `outcome_branch`: `claude/issue-<n>-<short-slug>`
    - `append_system_prompt`: the exact output of step 2, version line included
+     (or of `bin/playbook.py --stub`)
    - `prompt`: the worker brief below
 5. Update the status comment with `session`, `session_url`
    (`https://claude.ai/code/<session id>`) and `run` (the script's `run`
    object), and add each of its `notes` as a `⚠️ Run: <note>` line in the
    human part, keeping `phase: "dispatching"`; the
    worker moves it to `designing`. Re-read it first (the worker may already have
-   filled these in) and write it with `update_issue_comment`, not `gh api`: in
-   cloud sessions the proxy wraps session URLs in `gh api` bodies in backticks,
-   which breaks the status JSON.
+   filled these in).
 
 The model is decided once per session, at dispatch. Changing `model:*` /
 `effort:*` labels later never restarts or re-dispatches a running worker; it only
 affects sessions started afterwards (e.g. a fresh worker after `blocked` or a
 `claude:ping`, which goes through these same steps and overwrites `run`).
 
-Worker brief:
+### Status comment writes
+
+Use `bin/status.py` for status-comment edits instead of hand-made JSON:
+
+```bash
+bin/status.py get   <o/r#n>
+bin/status.py patch <o/r#n> [--phase P] [--set key=JSON ...] [--unset key ...] [--note TEXT] [--dry-run]
+bin/status.py label <o/r#n> [--add L] [--remove L]
+```
+
+`patch` merges into the JSON and keeps the rest (and the worker's human part)
+as found; `--phase` also swaps the `claude:<phase>` label without touching
+`claude`, `claude:next`/`paused`/`ping`, `model:*`, `effort:*` or `lane:quick`.
+Plain `gh api -X PATCH` mangles status comments in cloud sessions (the proxy
+puts a backtick before bare `https://claude.ai/...` URLs, breaking the JSON);
+`status.py` writes URLs as `https:\/\/` inside the JSON and as markdown links in
+the human part, which survive, and reads every write back to check it. Without
+the script, write status comments with the MCP `update_issue_comment`.
+
+Worker brief (what `bin/dispatch.py` writes; by hand, fill it in yourself):
 
 ```
 You are the claude-bot worker for <owner>/<repo>#<n>: "<title>".
@@ -254,7 +343,7 @@ Owners: <logins>
 Branch: claude/issue-<n>-<short-slug>
 Project settings:
 <the merged settings for this project as YAML, including notes>
-Follow the claude-bot worker playbook in your system prompt.
+Follow the claude-bot worker playbook in your system prompt (load it first if your system prompt says how).
 ```
 
 ### Messages to workers
@@ -280,7 +369,7 @@ not by hand:
 bin/dashboard.py --write          # gathers fresh, renders, updates the issue
 ```
 
-(or `bin/dashboard.py /tmp/claude-bot-snapshot.json --write` to reuse this pass's
+(or `bin/dashboard.py /tmp/claude-bot/snapshot.json --write` to reuse this pass's
 snapshot if nothing changed since step 1). It prints `updated #N` or
 `unchanged #N`.
 
