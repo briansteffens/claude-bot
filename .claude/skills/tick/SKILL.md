@@ -77,7 +77,10 @@ Each project has `build_slots` slots (default 2); with `build_scope: global` the
 slots are shared by all projects instead. An issue in phase `building` or
 `in-review` holds a slot until its PR merges or it's cancelled.
 
-1. **Holders** = issues in `building`/`in-review`. **Candidates** = issues in
+0. **Quick slot first** (see below): hand out any free quick slot before the
+   regular slots.
+1. **Holders** = issues in `building`/`in-review`, except those whose status has
+   `"slot": "quick"` (they hold the quick slot). **Candidates** = issues in
    `approved`, in queue order.
 2. **No holders:** send `BUILD` to the first candidate, no analysis needed (in
    inline mode: do the build now). The worker sets `building` itself.
@@ -116,6 +119,33 @@ When you hold a candidate back this way, record it in its status JSON as
 `"slot_hold": {"for": [<waiting non-L issue numbers>], "at": "<UTC>"}` and remove
 `slot_hold` once it gets `BUILD` or nothing is held back anymore; the dashboard
 shows it.
+
+### Quick slot
+
+Workers put small data-only issues (a new spawn entry, a config value, copy
+text) in the quick lane and record `"lane": "quick"` in the status JSON; the
+owner can force it with a `lane:quick` label. They skip the plan comment, go
+straight to `approved` and ping `tick`, so the turn that ping starts should get
+them building within a minute or two:
+
+- Each project has `quick_slots` (default 1) **on top of** `build_slots`, and
+  per project even with `build_scope: global`. None when `quick_lane: false`
+  or `preview: deploy` (every push redeploys one shared site): quick issues
+  there take a regular slot like any other.
+- **Quick holders** = `building`/`in-review` issues with `"slot": "quick"`.
+  **Quick candidates** = `approved` issues with `lane: "quick"`, in queue order.
+- When a quick slot is free, send `BUILD` to the first quick candidate that the
+  parallelism check clears against **every** holder, regular and quick (no
+  check when there are none). A purely additive data entry is safe unless a
+  holder edits the same entries. Record `"slot": "quick"` in its status JSON
+  in the same edit; the worker keeps it as found.
+- A quick candidate that doesn't get the quick slot may still take a free
+  regular slot like any other candidate (no `slot` field then); it counts as
+  `S` for the small-issue rule.
+- An issue that leaves the quick lane mid-build (`lane` back to `normal`)
+  keeps the slot it holds until it merges or is cancelled.
+- Missing `lane` = normal: workers on older playbooks never write it, and
+  issues without `slot` hold regular slots exactly as before.
 
 Never exceed the slot count. Never dispatch the same issue twice — check the status
 comment again right before dispatching or sending `BUILD`.
@@ -232,7 +262,7 @@ Follow the claude-bot worker playbook in your system prompt.
 Send with `send_message` (priority `later`) to the issue's session. One line each;
 the worker re-reads GitHub for details:
 
-- `BUILD` — you hold a build slot; start implementing.
+- `BUILD` — you hold a build slot (or the quick slot); start implementing.
 - `SYNC` — another PR in this project just merged; bring your branch up to date.
 - `ACTIVITY` — new owner input on the issue; re-read and respond.
 - `MERGED` / `CANCEL` — wrap up: unsubscribe from PR activity and stop.
@@ -265,7 +295,9 @@ What it shows (so you know what to keep in the status JSON): "Needs you" rows fo
 and preview links (`preview`, else the PR body's "Try it" link) and the
 revision; "In progress" per project with slots, phases and the parallelism
 verdicts from each issue's `parallel` (`reason` when not safe), each issue's
-`estimate` next to its title and any `slot_hold` in its notes; and "Recently
+`estimate` next to its title and any `slot_hold` in its notes, ⚡ on quick-lane
+issues (`lane`, or a `lane:quick` label) and the quick slot as "⚡ quick 0/1"
+beside the slot count (holders recorded with `slot: "quick"`); and "Recently
 merged" with PR comment counts. To change the layout, edit `bin/dashboard.py`.
 
 ## 5. Schedule the next tick

@@ -231,7 +231,31 @@ def playbook_version():
 PLAYBOOK = playbook_version()
 
 
-def notes_for(issue, slots_full, holders):
+def lane_of(issue):
+    """"quick" for quick-lane issues (worker's `lane`, or the owner's `lane:quick`
+    label before a worker has triaged it), else "normal". Older workers never
+    write `lane`, so they stay normal."""
+    lane = (issue.get("status") or {}).get("lane")
+    if lane in ("quick", "normal"):
+        return lane
+    return "quick" if "lane:quick" in (issue.get("labels") or []) else "normal"
+
+
+def in_quick_slot(issue):
+    """A holder the orchestrator gave the quick slot (recorded as `slot`)."""
+    return issue["phase"] in HOLDING and (issue.get("status") or {}).get("slot") == "quick"
+
+
+def quick_slot_total(settings):
+    """Quick slots per project: none when quick_lane is off or every push
+    redeploys one shared preview (`preview: deploy`)."""
+    if settings.get("quick_lane") is False or settings.get("preview") == "deploy":
+        return 0
+    total = settings.get("quick_slots", 1)
+    return total if isinstance(total, int) and total > 0 else 0
+
+
+def notes_for(issue, slots_full, holders, quick_free=False):
     status = issue.get("status") or {}
     if issue["paused"]:
         return "paused"
@@ -240,12 +264,14 @@ def notes_for(issue, slots_full, holders):
     if PLAYBOOK and status.get("session") and not status.get("playbook") and issue["phase"] in (
             "designing", "needs-input", "approved", "building", "in-review"):
         older = "older playbook (no progress reports)"
-        rest = notes_for({**issue, "status": {**status, "playbook": PLAYBOOK}}, slots_full, holders)
+        rest = notes_for({**issue, "status": {**status, "playbook": PLAYBOOK}}, slots_full, holders, quick_free)
         return f"{rest} · {older}" if rest else older
     if issue["phase"] in HOLDING:
-        return "slot"
+        return "quick slot" if in_quick_slot(issue) else "slot"
     if issue["phase"] != "approved":
         return ""
+    if lane_of(issue) == "quick" and quick_free:
+        return "next up (quick slot)"
     hold = status.get("slot_hold") or {}
     if hold and not slots_full:
         waiting = ", ".join(f"#{n}" for n in hold.get("for") or [])
@@ -265,7 +291,13 @@ def project_state(project, settings):
     """Slot usage and the live issues of one project, in dashboard order, as plain data."""
     issues = [i for i in project["issues"] if live(i)]
     holders = {i["number"] for i in issues if i["phase"] in HOLDING}
-    slots = {"used": len(holders), "total": settings.get("build_slots", 2)}
+    quick_holders = {i["number"] for i in issues if in_quick_slot(i)}
+    # `used`/`total` stay the regular build slots; quick-slot holders don't count.
+    slots = {"used": len(holders - quick_holders), "total": settings.get("build_slots", 2)}
+    quick_total = quick_slot_total(settings)
+    if quick_total or quick_holders:
+        slots["quick"] = {"used": len(quick_holders), "total": quick_total}
+    quick_free = len(quick_holders) < quick_total
     ranked = sorted(issues, key=lambda i: ORDER.index(i["phase"]) if i["phase"] in ORDER else len(ORDER))
     items = []
     for position, issue in enumerate(ranked, 1):
@@ -280,7 +312,8 @@ def project_state(project, settings):
             "session_url": status.get("session_url"),
             "progress": progress_of(issue),
             "estimate": estimate_of(issue),
-            "notes": notes_for(issue, slots["used"] >= slots["total"], holders),
+            "lane": lane_of(issue),
+            "notes": notes_for(issue, slots["used"] >= slots["total"], holders, quick_free),
         })
     return slots, items
 
@@ -290,7 +323,9 @@ def project_section(project, settings, today):
     slots, items = project_state(project, settings)
     if not items:
         return [f"### {repo}", "idle", ""]
-    lines = [f"### {repo} · slots {slots['used']}/{slots['total']}",
+    quick = slots.get("quick")
+    quick_text = f" · ⚡ quick {quick['used']}/{quick['total']}" if quick else ""
+    lines = [f"### {repo} · slots {slots['used']}/{slots['total']}{quick_text}",
              "| # | Issue | Phase | PR | Preview | Session | Notes |",
              "| --- | --- | --- | --- | --- | --- | --- |"]
     for item in items:
@@ -299,7 +334,7 @@ def project_section(project, settings, today):
         preview = item["preview"]
         session = link("open", item["session_url"]) if item["session_url"] else "—"
         lines.append(
-            f"| {item['position']} | {link('#' + str(item['number']), item['url'])} {item['title']}{estimate_text(item['estimate'])} "
+            f"| {item['position']} | {link('#' + str(item['number']), item['url'])} {'⚡ ' if item['lane'] == 'quick' else ''}{item['title']}{estimate_text(item['estimate'])} "
             f"| {item['phase_text']} | {pr_cell} "
             f"| {link('▶️', preview) if preview else '—'} | {session} | {item['notes']} |"
         )
@@ -351,7 +386,7 @@ def model(snapshot):
         slots, items = project_state(project, settings)
         sections.append({
             "repo": project["repo"], "slots": slots, "issues": items,
-            "settings": {key: settings.get(key) for key in ("merge", "preview", "preview_url", "design_venue", "build_slots", "small_slot")},
+            "settings": {key: settings.get(key) for key in ("merge", "preview", "preview_url", "design_venue", "build_slots", "small_slot", "quick_lane", "quick_slots", "quick_cap_minutes")},
         })
     return {
         "version": 1,

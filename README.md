@@ -44,6 +44,14 @@ type into, while GitHub issues stay the main interface.
   given to a large build while a small or medium issue is approved or still being
   designed, so quick fixes don't pile up behind long builds. `claude:next`
   overrides it; `small_slot: false` turns it off for a project.
+- **A quick lane for data-only changes.** "Add a WRX at the Ferry Building" isn't
+  worth a plan comment or a deep play-check. When an issue only adds or changes
+  entries in existing data (or you label it `lane:quick`), the worker skips the
+  plan comment and gets a quick slot of its own on top of `build_slots`. It
+  play-checks just what changed, in at most 10 minutes, and opens the PR by
+  `quick_cap_minutes` (25) whatever happens, listing anything it couldn't verify.
+  If the change turns out to need real code, it drops back to the normal lane.
+  `quick_lane: false` turns it off.
 - **Design only when it's worth it.** With `design_stage: auto` the worker skips
   the design round for straightforward issues (posting its plan and assumptions on
   the issue so you can object) and goes straight to building. Issues with real
