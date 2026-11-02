@@ -87,6 +87,14 @@ You can reply in plain language — the bot interprets intent rather than parsin
 commands. Labels `claude:next` (jump the queue) and `claude:paused` (leave alone)
 work at any time.
 
+Optional `model:<opus|sonnet|haiku|fable>` and `effort:<low|medium|high|max>`
+labels pick the worker session's model and reasoning effort when it's started
+(the factory app's new-issue form sets them). No label = the default; changing
+them later only affects sessions started afterwards. Effort is validated and
+recorded but not applied yet, because the session API has no effort setting.
+The alias → model ID table lives in `bin/run_config.py`; see CLAUDE.md for the
+details.
+
 ## Why this design (and not a script)
 
 | Option | See/steer the conversation? | Verdict |
@@ -207,4 +215,5 @@ exercises the new behaviour before opening the PR.
 | `.claude/skills/tick/SKILL.md` | One orchestration pass |
 | `.claude/skills/work-issue/SKILL.md` | Worker playbook: design → build → PR → merge |
 | `.claude/skills/bot-setup/SKILL.md` | Setup and re-binding |
+| `bin/run_config.py` | `model:*` / `effort:*` labels → worker model; the alias → model ID table |
 | `run-local.sh` | Run locally in tmux |

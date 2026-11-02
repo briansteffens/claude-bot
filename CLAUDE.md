@@ -70,3 +70,21 @@ reasoning and step in.
 | `claude:in-review` | bot | PR open (holds a build slot) |
 | `claude:blocked` | bot | Stuck; status comment says why |
 | `claude:done` | bot | Merged |
+
+### Model labels
+
+Optional, set by the owner or the factory app's new-issue form. Read once when the
+orchestrator starts a worker session for the issue (`bin/run_config.py`, which also
+holds the alias → model ID table); changing them later only affects sessions
+started after the change. They aren't `claude:` labels, so nothing tidies them away.
+Careful: the MCP `issue_write` `labels` field replaces the whole list, so when
+changing phase labels that way, pass every other label (these included) along.
+
+| Label | Meaning |
+| --- | --- |
+| `model:opus` / `model:sonnet` / `model:haiku` / `model:fable` | Worker session runs on that model family's current model |
+| `effort:low` / `effort:medium` / `effort:high` / `effort:max` | Worker reasoning effort. Validated and recorded, but not applied yet: the session API has no effort setting |
+
+No label of a kind = the default. Two labels of a kind, or an unknown value: that
+kind falls back to the default and the status comment says so. What was used is
+recorded as `run` in the status JSON (`null` = default).

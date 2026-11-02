@@ -64,7 +64,7 @@ Apply the first matching rule:
 | Label `claude:ping` | The owner says this worker is stuck (factory ⚡ Unstick); handle these first. `get_session` the worker: if it exists and isn't `failed`, send `RESUME` (priority `next`; unarchive it first if archived). If it's missing or failed, dispatch a fresh worker with directive `RESUME`; with no session yet (a queued issue), dispatch it now with `DESIGN`, even if `design_ahead` is full: the ping means "start this one". Then remove the label (`gh api -X DELETE repos/<o>/<r>/issues/<n>/labels/claude:ping`), note it in the report, and keep applying the rules below. |
 | Phase `done` / `cancelled` | Nothing. |
 | PR merged, phase not `done` | Finalize as the playbook's "Merged" step describes (status → `done`, label, summary comment, close the issue if still open, notify). Tell the worker `MERGED` so it unsubscribes. Then send `SYNC` to every other `building`/`in-review` worker in the same project: the base moved under them. |
-| Issue closed without a merged PR | Status → `cancelled`, remove `claude:*` phase labels, send worker `CANCEL`. Leave any PR for the owner, but with `preview: pages` delete its `pr-<n>/` from the `previews` branch once that PR is closed. |
+| Issue closed without a merged PR | Status → `cancelled`, remove `claude:*` phase labels (never other labels such as `model:*` / `effort:*`), send worker `CANCEL`. Leave any PR for the owner, but with `preview: pages` delete its `pr-<n>/` from the `previews` branch once that PR is closed. |
 | Phase `dispatching` with no session id | A previous tick died mid-dispatch: `list_sessions` with tag `claude-bot:<repo>#<n>`; adopt a match, otherwise dispatch again. |
 | Worker `status_bucket` = `failed`, or session missing | Status → `blocked` with the reason, notify the owner. Owner can reply "retry" to get a fresh worker. |
 | Phase `blocked` and an unhandled owner comment says retry/continue | Dispatch a fresh worker with directive `RESUME` (reuse the session if it still exists). |
@@ -180,19 +180,37 @@ this tick.
 2. Run `bin/playbook.py` **now, for this dispatch** — never reuse playbook text
    from earlier in this conversation; it changes often. Its last line is
    `Playbook version: <v>`; check `<v>` equals `bin/playbook.py --version`.
-3. `create_session`:
+3. Pick the model from the issue's labels **as they are now** (fetch them fresh,
+   don't reuse the snapshot's if it's older than this dispatch): run
+   `bin/run_config.py <label> <label> ...` (or `bin/run_config.py --issue
+   <owner>/<repo>#<n>`). It reads `model:<alias>` / `effort:<level>` and prints
+   JSON with `model_id`, `effort`, `run` and `notes`. Unlabelled issues give
+   `model_id: null`, which means: dispatch exactly as before.
+4. `create_session`:
+   - `model`: the `model_id`, **only if it isn't null** (otherwise omit the
+     parameter so the session gets today's default)
+   - effort: `create_session` has no reasoning-effort parameter yet, so
+     `run_config.py` reports `effort: null` and a note. Never imitate effort
+     with prompt text.
    - `source_url`: `https://github.com/<owner>/<repo>`
    - `title`: `claude-bot: <owner>/<repo>#<n> <issue title>` (truncate to ~80 chars)
    - `tags`: `["claude-bot", "claude-bot:<owner>/<repo>#<n>"]`
    - `outcome_branch`: `claude/issue-<n>-<short-slug>`
    - `append_system_prompt`: the exact output of step 2, version line included
    - `prompt`: the worker brief below
-4. Update the status comment with `session` and `session_url`
-   (`https://claude.ai/code/<session id>`), keeping `phase: "dispatching"`; the
+5. Update the status comment with `session`, `session_url`
+   (`https://claude.ai/code/<session id>`) and `run` (the script's `run`
+   object), and add each of its `notes` as a `⚠️ Run: <note>` line in the
+   human part, keeping `phase: "dispatching"`; the
    worker moves it to `designing`. Re-read it first (the worker may already have
    filled these in) and write it with `update_issue_comment`, not `gh api`: in
    cloud sessions the proxy wraps session URLs in `gh api` bodies in backticks,
    which breaks the status JSON.
+
+The model is decided once per session, at dispatch. Changing `model:*` /
+`effort:*` labels later never restarts or re-dispatches a running worker; it only
+affects sessions started afterwards (e.g. a fresh worker after `blocked` or a
+`claude:ping`, which goes through these same steps and overwrites `run`).
 
 Worker brief:
 
