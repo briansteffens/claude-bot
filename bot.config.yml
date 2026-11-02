@@ -79,7 +79,7 @@ projects:
       there is no PR CI, so run typecheck/test/build yourself before pushing.
       README.md documents the rules in detail: update it when gameplay changes.
   - repo: briansteffens/bay-area-pirates
-    build_slots: 4
+    build_slots: 5
     design_ahead: 8
     preview: pages
     notes: |
