@@ -88,3 +88,12 @@ changing phase labels that way, pass every other label (these included) along.
 No label of a kind = the default. Two labels of a kind, or an unknown value: that
 kind falls back to the default and the status comment says so. What was used is
 recorded as `run` in the status JSON (`null` = default).
+
+### Lane label
+
+| Label | Meaning |
+| --- | --- |
+| `lane:quick` | Force the quick lane: a small data-only change, built in the project's quick slot with no plan comment and a time-boxed play-check (see the work-issue and tick skills). Without it, the worker decides in triage. |
+
+Deliberately not a `claude:` label, so phase-label tidying, `bin/watch-new.py`
+and workers on older playbooks leave it alone.

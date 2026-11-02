@@ -39,6 +39,16 @@ defaults:
   # so large builds can't fill every slot while quick issues pile up.
   # `claude:next` on a large issue overrides it. false = plain queue order.
   small_slot: true
+  # Quick lane for small data-only issues (a new spawn entry, a config value,
+  # copy text): no plan comment, a play-check scoped to the change with a
+  # 10-minute box, and their own build slot on top of build_slots, so they don't
+  # queue behind big builds. Workers pick it in triage; label an issue
+  # `lane:quick` to force it. Projects with `preview: deploy` get no quick slot.
+  quick_lane: true
+  quick_slots: 1
+  # A quick build that hits this many minutes opens its PR anyway, with what
+  # wasn't verified under Notes.
+  quick_cap_minutes: 25
   # The design is committed on the PR branch as .claude-bot/design-<n>.md.
   # drop - delete it in the build commit; keep - move it to docs/designs/.
   design_doc: drop

@@ -94,6 +94,11 @@ play it, comment or merge) or `"revising"` (yours: working on their feedback).
 `revision` counts the builds the owner has been handed: 1 for the first, +1 each
 time you hand back a revised one.
 
+`lane` is `"quick"` for issues in the quick lane (see Triage), and `"normal"`
+(or missing) for everything else. The orchestrator gives quick-lane issues their
+own build slot, so set it honestly, and set it back to `"normal"` the moment the
+work turns out to need more than data.
+
 ### Progress
 
 While you're working (stages `designing`, `building`, and `revising` = in-review
@@ -115,7 +120,9 @@ dashboard can show how far along you are:
   - `revising`: one step per piece of owner feedback, then the same tail.
 - `step` is what you're on now, in a few words; `at` is when you wrote it.
 - **Update it whenever a step completes** (one status-comment edit; batch steps
-  that finish within a couple of minutes). A step running longer than ~20
+  that finish within a couple of minutes), and **before** starting any step you
+  expect to take more than ~5 minutes (dependency install, full build, deploy
+  wait, play-check), with `step` naming it, so a long step shows as such. A step running longer than ~20
   minutes gets an update anyway, with `step` saying what's taking the time:
   the dashboard flags reports older than 30 minutes as stalled.
 - If the work turns out bigger, it's fine for `total` to grow; say so in `step`
@@ -204,6 +211,40 @@ on.
 Set phase `designing` with `progress` at `0/4` (see Progress), read the issue and enough of the codebase to know what the
 change involves, write a first `estimate` (see State), then decide whether a
 design discussion is worth the owner's time.
+
+Start the project's dependency install (`npm ci` or the equivalent from the
+project notes) **in the background** as soon as you've cloned, so it's done by
+the time you build. If the issue ends up in a design round, that's harmless.
+
+### Quick lane
+
+An issue goes in the **quick lane** when the project's `quick_lane` isn't
+`false`, `design_stage` isn't `always`, and either the owner labelled it
+`lane:quick` or **all** of these hold:
+
+- it only adds or changes **entries in existing data**: a spawn or registry
+  entry, a config value, copy text, a colour, a position;
+- the repo already has an entry of the same kind to copy;
+- no new code paths: no new functions, systems, shaders or file formats;
+- about 3 files or fewer.
+
+Quick-lane issues:
+
+- skip the plan comment: record `lane: "quick"`, `design: "skipped"`, the
+  `footprint` and an `S` `estimate`, set phase `approved` and ping `tick` at
+  once (the orchestrator hands out a quick slot on that ping), then wait for
+  `BUILD`. The PR body's "What changed" and Notes carry the plan and the
+  assumptions you made;
+- get a play-check scoped to the diff with a **10-minute** box and a hard
+  **cap** on the whole build (Build steps 5 and 7);
+- leave the lane if the work turns out to need logic, or the owner's label
+  asks for something that isn't data: set `lane: "normal"`, re-estimate, say
+  why in `progress.step`, update the footprint, ping `tick`, and carry on as a
+  normal fast-path build. Don't stop to ask unless a real decision comes up.
+  (The quick slot you hold is fine to keep; the orchestrator sorts it out.)
+
+If the owner labelled it `lane:quick` but the issue clearly needs a design
+round, say so in a short issue comment and use the normal lane.
 
 **Skip it (fast path)** when all of these hold — and `design_stage` is `auto`:
 
@@ -356,6 +397,18 @@ footprint and avoid drive-by refactors or reformatting of shared files.
      it in (for `artifact`, as claude.ai serves it): load it in headless Chromium
      with Playwright (pre-installed in cloud sessions), exercise the new behaviour,
      check the console for errors. Fix what you find before asking for review.
+   - **Scope the play-check to the diff.** Check what the change touches and
+     what it could plausibly break, not systems it didn't change (adding a
+     vehicle doesn't call for driving-physics tests). For a quick-lane spawn
+     entry: it loads, it's at the right place and heading, it renders, one
+     basic interaction (board/enter/use it) works, no new console errors.
+   - **Overlap the deploy wait** (`pages`, `deploy`): push the preview first,
+     then play-check the local build (e.g. `npx vite preview`, or the built
+     files over a local static server) while it deploys. Once it's live, just
+     confirm the version marker / commit and that the page loads without
+     console errors; no second full play-check at the URL.
+   - **Quick lane: 10-minute box** on the play-check. When it runs out, stop
+     and list what was and wasn't verified under the PR's Notes.
 6. Remove `.claude-bot/design-<n>.md` (or move it, per `design_doc`). Commit with a
    clear message and push.
 7. PR:
@@ -381,6 +434,12 @@ Closes #<n>
 ## Notes
 Deviations from the design or assumptions made, follow-up ideas.
 ```
+
+   **Quick-lane cap.** If the build (from `BUILD`) reaches `quick_cap_minutes`
+   (project setting, default 25) without a PR, stop where you are: commit what
+   works, open or ready the PR with what's done and the open findings under
+   Notes, and hand it over as below. The owner can say "keep going". A build
+   that left the quick lane has no cap.
 
 8. If `merge: auto-merge`, enable auto-merge on the PR (squash). If GitHub refuses
    (auto-merge disabled for the repo, or no protection rules), say so in the status

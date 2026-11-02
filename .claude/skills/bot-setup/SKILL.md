@@ -41,6 +41,7 @@ Re-runnable: every step checks before it creates.
    | `effort:medium` | `c2e0c6` | claude-bot: worker reasoning effort |
    | `effort:high` | `c2e0c6` | claude-bot: worker reasoning effort |
    | `effort:max` | `c2e0c6` | claude-bot: worker reasoning effort |
+   | `lane:quick` | `fef2c0` | claude-bot: small data-only change, fast lane |
 
    The GitHub MCP server has no label-create tool. Use the REST API through `gh`:
    `gh api repos/<o>/<r>/labels -f name=<name> -f color=<c> -f description=<d>`
