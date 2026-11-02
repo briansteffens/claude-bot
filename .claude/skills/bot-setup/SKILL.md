@@ -33,6 +33,14 @@ Re-runnable: every step checks before it creates.
    | `claude:in-review` | `5319e7` | claude-bot: PR open |
    | `claude:blocked` | `b60205` | claude-bot: stuck, see status |
    | `claude:done` | `0e8a16` | claude-bot: merged |
+   | `model:opus` | `5319e7` | claude-bot: run the worker on Opus |
+   | `model:sonnet` | `5319e7` | claude-bot: run the worker on Sonnet |
+   | `model:haiku` | `5319e7` | claude-bot: run the worker on Haiku |
+   | `model:fable` | `5319e7` | claude-bot: run the worker on Fable |
+   | `effort:low` | `c2e0c6` | claude-bot: worker reasoning effort |
+   | `effort:medium` | `c2e0c6` | claude-bot: worker reasoning effort |
+   | `effort:high` | `c2e0c6` | claude-bot: worker reasoning effort |
+   | `effort:max` | `c2e0c6` | claude-bot: worker reasoning effort |
 
    The GitHub MCP server has no label-create tool. Use the REST API through `gh`:
    `gh api repos/<o>/<r>/labels -f name=<name> -f color=<c> -f description=<d>`

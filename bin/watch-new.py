@@ -44,7 +44,10 @@ def queued(repo):
         if "pull_request" in issue:
             continue
         labels = {label["name"] for label in issue["labels"]}
-        if "claude:paused" in labels or labels - QUIET:
+        # Only `claude:<phase>` labels mean the bot has started on it; other
+        # labels (model:*, effort:*, bug, ...) don't.
+        phased = {name for name in labels if name.startswith("claude:")} - QUIET
+        if "claude:paused" in labels or phased:
             continue
         # A ping on a queued issue means "start it now": report it as new even
         # if it was already queued when the watcher started.

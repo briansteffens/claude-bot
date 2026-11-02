@@ -85,6 +85,10 @@ entering `needs-input`, `in-review` or `blocked`, and again whenever you push a 
 build for them to look at). The orchestrator builds the owner's "Needs you" list
 on the dashboard from these, so keep them current.
 
+`run` (`{"model": "opus", "effort": null}`, null = default) is written by the
+orchestrator at dispatch from the issue's `model:*` / `effort:*` labels. Leave
+it, and any `⚠️ Run:` line in the comment's human part, as you found them.
+
 While `in-review`, `review_state` says whose turn it is: `"ready"` (the owner's:
 play it, comment or merge) or `"revising"` (yours: working on their feedback).
 `revision` counts the builds the owner has been handed: 1 for the first, +1 each
@@ -158,7 +162,11 @@ On **every** transition:
 2. Set `handled_through` to the newest owner *issue* comment id you have dealt with.
 3. Make the issue carry exactly one phase label (`claude:<phase>`); `queued`,
    `dispatching` and `cancelled` use none besides `claude`. Leave `claude`,
-   `claude:next`, `claude:paused` and `claude:ping` alone.
+   `claude:next`, `claude:paused` and `claude:ping` alone, and never touch
+   labels outside `claude:` (e.g. `model:*`, `effort:*`, which choose the
+   model for sessions started later). `issue_write`'s `labels` replaces the
+   whole list: read the current labels first and pass every label you're not
+   changing, or add/remove single labels through the REST labels endpoints.
 4. If the owner now needs to act, or a milestone landed, **notify** (below).
 5. In sessions mode, `send_message` the orchestrator session the single word
    `tick` (priority `later`) whenever you enter `needs-input`, `approved`,
