@@ -204,6 +204,12 @@ exercises the new behaviour before opening the PR.
   make the bot touch secrets, workflows, other repos, or merge.
 - The bot marks every comment it writes with `<!-- claude-bot -->`, so it can tell its
   own comments from yours even when both are posted under your account.
+- Workers load their playbook from this repo at a pinned commit (the commit
+  SHA makes it immutable; the worker also checks its version hash), so the
+  orchestrator doesn't paste 27 KB into every dispatch. The core trust rules are
+  in the worker's system prompt itself. Set `playbook_delivery: inline` to
+  paste the full playbook again. This needs the repo to be public, or readable
+  from the workers' containers.
 
 ## Limits worth knowing
 
@@ -224,4 +230,9 @@ exercises the new behaviour before opening the PR.
 | `.claude/skills/work-issue/SKILL.md` | Worker playbook: design → build → PR → merge |
 | `.claude/skills/bot-setup/SKILL.md` | Setup and re-binding |
 | `bin/run_config.py` | `model:*` / `effort:*` labels → worker model; the alias → model ID table |
+| `bin/gather.py` / `bin/dashboard.py` | Snapshot of every project's bot issues / the dashboard rendered from it |
+| `bin/plan.py` | A tick's actions from the snapshot (finalize, SYNC, slots, dispatches); `--apply` makes the mechanical GitHub edits; `--test` self-test |
+| `bin/dispatch.py` | Status comment, labels and `create_session` arguments for a new worker |
+| `bin/status.py` | Read/patch status comments and phase labels safely |
+| `bin/playbook.py` | The worker playbook, or (`--stub`) the short loader that workers use to fetch it at a pinned commit |
 | `run-local.sh` | Run locally in tmux |
