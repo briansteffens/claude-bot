@@ -1,5 +1,11 @@
 # Design #8: a quick lane for small data-only changes
 
+## Decisions (owner, on #9)
+1. Quick slot handed out by the orchestrator on the worker's ping.
+2. Label `lane:quick`.
+3. 10-minute play-check box, 25-minute build cap.
+4. No plan comment for quick-lane issues.
+
 ## Goal
 A data-only issue ("add a WRX at the Ferry Building") goes from the `claude` label to a
 PR with a playable preview in about 15–20 minutes, not 50+.
