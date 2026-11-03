@@ -105,6 +105,16 @@ the session API's default. Two labels of a kind, or an unknown value: that
 kind falls back to the default and the status comment says so. What was used is
 recorded as `run` in the status JSON (`null` = default).
 
+### Orchestrator model
+
+Separate from the worker models above: `orchestrator: {model, subagents}` in
+`bot.config.yml` (sonnet / opus). `model` is what this session should run on;
+`/tick` step 0 checks it with `bin/run_config.py --orchestrator --current
+<model>` and reports a mismatch as one ⚠️ line. A session can't change its own
+model, so the owner switches (`/model sonnet`, or a new session + `/bot-setup`);
+never migrate yourself. `subagents` is the Agent tool `model` for subagents
+this session spawns (the parallelism / estimate check).
+
 ### Lane label
 
 | Label | Meaning |

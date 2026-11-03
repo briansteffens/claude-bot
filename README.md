@@ -106,6 +106,14 @@ issue gets its build slot a fresh opus session takes over the build (quick-lane
 issues stay in their first session). The alias → model ID table lives in
 `bin/run_config.py`; see CLAUDE.md for the details.
 
+The orchestrator itself is configured separately, by `orchestrator: {model:
+sonnet, subagents: opus}` in `bot.config.yml`: its passes are bookkeeping, so it
+runs on Sonnet, while the subagents it spawns for judgement calls (the
+parallelism / estimate check) run on Opus. A session can't change its own
+model, so `/tick` only checks it and adds a ⚠️ line to its report on a
+mismatch; switch with `/model sonnet` in the orchestrator session, or start a
+new session on Sonnet and run `/bot-setup` there (it moves the heartbeat).
+
 ## Why this design (and not a script)
 
 | Option | See/steer the conversation? | Verdict |
@@ -232,7 +240,7 @@ exercises the new behaviour before opening the PR.
 | `.claude/skills/tick/SKILL.md` | One orchestration pass |
 | `.claude/skills/work-issue/SKILL.md` | Worker playbook: design → build → PR → merge |
 | `.claude/skills/bot-setup/SKILL.md` | Setup and re-binding |
-| `bin/run_config.py` | `model:*` / `effort:*` labels and `models:` stage defaults → worker model; the alias → model ID table |
+| `bin/run_config.py` | `model:*` / `effort:*` labels and `models:` stage defaults → worker model; `--orchestrator` checks the orchestrator's own model; the alias → model ID table |
 | `bin/gather.py` / `bin/dashboard.py` | Snapshot of every project's bot issues / the dashboard rendered from it |
 | `bin/plan.py` | A tick's actions from the snapshot (finalize, SYNC, slots, dispatches); `--apply` makes the mechanical GitHub edits; `--test` self-test |
 | `bin/dispatch.py` | Status comment, labels and `create_session` arguments for a new worker |

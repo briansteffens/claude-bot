@@ -20,6 +20,20 @@ mode: auto
 #   global      - `build_slots` is shared across every configured repo.
 build_scope: per-project
 
+# Models for the orchestrator itself (aliases from bin/run_config.py):
+#   model     - what the orchestrator session should run on. Its work is
+#               bookkeeping (scripts, labels, messages), so a lighter model is
+#               plenty. A session's model is fixed when it starts and can't be
+#               changed from inside it, so /tick only checks and reminds; switch
+#               with /model in the session, or start a new session on this model
+#               and run /bot-setup there (it moves the heartbeat).
+#   subagents - the model for subagents the orchestrator spawns with the Agent
+#               tool (the parallelism / estimate check), which need judgement.
+# Worker sessions are chosen separately: `models:` under defaults, and labels.
+orchestrator:
+  model: sonnet
+  subagents: opus
+
 # Defaults applied to every project unless the project overrides them.
 defaults:
   # auto   - the worker skips the design round for straightforward issues (clear

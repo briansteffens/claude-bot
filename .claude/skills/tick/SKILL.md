@@ -17,6 +17,11 @@ time. All state lives on GitHub (see CLAUDE.md), so re-derive everything from th
 3. Resolve the mode. `auto` → `sessions` if `mcp__claude-code-remote__create_session`
    is available, else `inline`.
 4. Note this session's id (`get_session` with no id) — workers need it to ping you.
+   Then check this session's own model against `orchestrator.model`:
+   `bin/run_config.py --orchestrator --current <session_context.model>`. If it
+   prints a note (`matches: false`), put it in the report as one ⚠️ line; don't
+   try to switch or migrate yourself (a second orchestrator could double-dispatch).
+   Keep its `subagents` value for the Agent tool's `model` below.
 5. `bin/dashboard-loop.sh --ensure` — keeps a background loop refreshing the
    dashboard every minute, independent of how busy or slow this session is. The
    container can be recycled while idle, which kills it, so ensure it every turn.
@@ -202,8 +207,9 @@ new commits since `checked` (its real diff is better evidence than its plan),
 or the small-issue rule needs a size that a candidate, or a waiting `designing`
 issue, doesn't have yet.
 
-Spawn one subagent (Agent tool, `general-purpose`) for all candidates at once, so
-the analysis stays out of this session's context:
+Spawn one subagent (Agent tool, `general-purpose`, `model` = the `subagents`
+alias from step 0, e.g. `opus`; omit `model` when it's null) for all candidates
+at once, so the analysis stays out of this session's context:
 
 ```
 Decide which of these queued issues in <owner>/<repo> can be built in parallel with
