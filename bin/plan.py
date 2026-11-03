@@ -23,7 +23,10 @@ With no snapshot path it runs bin/gather.py. Prints JSON:
      "adopt": [{issue}],                      dispatching without a session: list_sessions by tag
      "retry": [{issue, session, comments}],   blocked + new owner comments: read them, retry if asked
      "nudge": [{issue, session, why}],        ACTIVITY, unless the worker's status_bucket is working
-     "build": [{issue, session, slot}],       send BUILD (--apply records slot/clears slot_hold first)
+     "build": [{issue, session, slot, handoff?}],  send BUILD (--apply records slot/clears slot_hold
+                                              first); with `handoff` ({model, model_id}), start a
+                                              build-stage session instead (tick: "Hand-off to a
+                                              build session")
      "needs_parallel_check": {...} | null,    run the subagent, record verdicts, run plan.py again
      "needs_estimate": [issue],               ask the subagent for these sizes too
      "hold": [{issue, for}], "clear_hold": [issue],   slot_hold to set / remove (--apply does)
@@ -45,6 +48,8 @@ from datetime import datetime, timedelta, timezone
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
+
+import run_config  # noqa: E402
 
 HOLDING = ("building", "in-review")
 PRE_BUILD = ("dispatching", "designing", "needs-input", "approved")
@@ -104,6 +109,30 @@ def quick_total(settings):
         return 0
     total = settings.get("quick_slots", 1)
     return total if isinstance(total, int) and total > 0 else 0
+
+
+def handoff(issue, settings):
+    """{model, model_id} when this BUILD should go to a fresh build-stage
+    session, else None. Only for sessions recorded as design-stage (dispatched
+    with per-stage models; older workers have no `stage`), never for the quick
+    lane (built in its design session), and only if the build model differs."""
+    run = status_of(issue).get("run") or {}
+    if run.get("stage") != "design" or lane(issue) == "quick":
+        return None
+    models = run_config.stage_models({"defaults": {"models": settings.get("models")}})
+    resolved = run_config.resolve(issue.get("labels") or [], "build", models)
+    if resolved["run"]["model"] == run.get("model"):
+        return None
+    return {"model": resolved["run"]["model"], "model_id": resolved["model_id"]}
+
+
+def build_item(issue, slot, settings):
+    item = {"issue": issue["number"], "session": session_of(issue), "slot": slot,
+            "comment_id": issue.get("status_comment_id")}
+    moved = handoff(issue, settings)
+    if moved:
+        item["handoff"] = moved
+    return item
 
 
 def verdict(candidate, holders):
@@ -275,11 +304,9 @@ def plan_project(project, settings, now, regular_pool=None):
         out.setdefault("slots", {})["quick"] = f"{len(quick_holders)}/{q_total}"
 
     for issue in quick_picks:
-        out["build"].append({"issue": issue["number"], "session": session_of(issue), "slot": "quick",
-                             "comment_id": issue.get("status_comment_id")})
+        out["build"].append(build_item(issue, "quick", settings))
     for issue in picks:
-        out["build"].append({"issue": issue["number"], "session": session_of(issue), "slot": "regular",
-                             "comment_id": issue.get("status_comment_id")})
+        out["build"].append(build_item(issue, "regular", settings))
     for number, waiting in sorted(holds.items()):
         out["hold"].append({"issue": number, "for": waiting})
     held = set(holds)
@@ -329,8 +356,8 @@ def plan(snapshot, config, now=None):
         repo_of = {id(c): r for r, c in order}
         by_repo = {p["repo"]: p for p in projects}
         for issue in picks:
-            by_repo[repo_of[id(issue)]]["build"].append({"issue": issue["number"], "session": session_of(issue),
-                                                         "slot": "regular", "comment_id": issue.get("status_comment_id")})
+            repo = repo_of[id(issue)]
+            by_repo[repo]["build"].append(build_item(issue, "regular", settings.get(repo, config.get("defaults") or {})))
         for issue in needs_check:
             entry = by_repo[repo_of[id(issue)]]
             entry["needs_parallel_check"] = entry["needs_parallel_check"] or {
@@ -438,6 +465,28 @@ def self_test():
         return plan({"projects": [{"repo": "o/r", "issues": issues}]}, config, now)["projects"][0]
 
     est = {"S": {"size": "S"}, "M": {"size": "M"}, "L": {"size": "L"}}
+
+    models = {"design": "fable", "build": "opus"}
+    design_run = {"model": "fable", "effort": None, "stage": "design"}
+    p = run([fixture(1, "approved", session="s1", run=design_run)], models=models)
+    check("handoff: design-stage session, build model differs", p["build"][0].get("handoff"),
+          {"model": "opus", "model_id": run_config.MODELS["opus"]})
+    p = run([fixture(1, "approved", session="s1", run={"model": None, "effort": None})], models=models)
+    check("no handoff: worker dispatched before stages (no run.stage)", "handoff" in p["build"][0], False)
+    p = run([fixture(1, "approved", session="s1", run=design_run, lane="quick")], models=models)
+    check("no handoff: quick lane builds in its design session",
+          (p["build"][0]["slot"], "handoff" in p["build"][0]), ("quick", False))
+    p = run([fixture(1, "approved", ["model:sonnet"], session="s1",
+                     run={"model": "sonnet", "effort": None, "stage": "design"})], models=models)
+    check("no handoff: model: label pins both stages", "handoff" in p["build"][0], False)
+    p = run([fixture(1, "approved", session="s1", run={"model": None, "effort": None, "stage": "design"})])
+    check("no handoff: no models configured", "handoff" in p["build"][0], False)
+    p = run([fixture(1, "approved", ["model:haiku"], session="s1", run=design_run)], models=models)
+    check("handoff: label added after dispatch is the build model", p["build"][0].get("handoff", {}).get("model"),
+          "haiku")
+    p = run([fixture(1, "approved", session="s1", run={"model": "opus", "effort": None, "stage": "build"})],
+            models=models)
+    check("no handoff: already a build-stage session", "handoff" in p["build"][0], False)
 
     p = run([fixture(1, "approved", session="s1", estimate=est["M"]), fixture(2, "approved", session="s2")])
     check("no holders: queue head builds without a check", [b["issue"] for b in p["build"]], [1])

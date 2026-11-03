@@ -80,6 +80,15 @@ defaults:
   #            its version hash and follows it. Keeps dispatch cheap.
   #   inline - the whole ~27 KB playbook goes in the system prompt, as before.
   playbook_delivery: fetch
+  # Default worker model per stage (aliases from bin/run_config.py). A worker
+  # session's model is fixed when it starts, so when `build` differs from
+  # `design`, a new session takes over the build at BUILD (the design session
+  # stops but stays open to read). A `model:` label on an issue pins both
+  # stages; quick-lane issues are built in their design session. Leave this out
+  # (or set `models: null` in a project) for one session on the default model.
+  models:
+    design: fable
+    build: opus
 
 projects:
   - repo: briansteffens/minefield-commander

@@ -13,14 +13,21 @@ session), so dispatch is three steps:
       -> writes session, session_url and run (+ ⚠️ Run: notes) into the status
          comment, keeping whatever phase the worker has reached
 
-The model comes from the issue's labels as they are at `prepare` (bin/run_config.py).
+The model comes from the issue's labels as they are at `prepare`, else the
+project's `models:` default for the session's stage (bin/run_config.py). The
+stage is `design` for a new worker, `build` with `--directive BUILD` (the
+hand-off to a build session, see bin/plan.py), and for a redispatch whatever
+stage the status JSON's `run` already records.
 `append_system_prompt` is the short loader from `bin/playbook.py --stub`, or the
 full playbook when bot.config.yml sets `playbook_delivery: inline` (or with
 --inline).
 
 Options for prepare:
   --orchestrator ID   this orchestrator's session id (required)
-  --directive D       DESIGN (default) or RESUME
+  --directive D       DESIGN (default), RESUME, or BUILD (hand-off: a fresh
+                      build-stage session for an approved issue; implies
+                      --redispatch and --stage build)
+  --stage S           design or build: override the stage picked above
   --notes FILE        orchestrator notes to append to the brief ("-" = stdin)
   --redispatch        allow an issue whose status already names a session
                       (blocked worker, claude:ping on a dead one); the phase is
@@ -106,7 +113,18 @@ Follow the claude-bot worker playbook in your system prompt (load it first if yo
     return text
 
 
-def prepare(ref, orchestrator, directive="DESIGN", notes=None, redispatch=False, inline=None, dry_run=False):
+def pick_stage(directive, status, stage=None):
+    """The stage a new session is for: explicit, BUILD -> build, else the
+    stage already recorded (a redispatch keeps it), else design."""
+    if stage:
+        return stage
+    if directive == "BUILD":
+        return "build"
+    return ((status or {}).get("run") or {}).get("stage") or "design"
+
+
+def prepare(ref, orchestrator, directive="DESIGN", notes=None, redispatch=False, inline=None, dry_run=False,
+            stage=None):
     repo, number = st.parse_ref(ref)
     config, projects = load_config()
     if repo not in projects:
@@ -123,7 +141,8 @@ def prepare(ref, orchestrator, directive="DESIGN", notes=None, redispatch=False,
     owner_ids = [c["id"] for c in comments
                  if c["user"]["login"] in owners and not (c.get("body") or "").startswith(st.BOT_MARKER)]
     handled = max(owner_ids, default=0)
-    run = run_config.resolve(labels)
+    stage = pick_stage(directive, status, stage)
+    run = run_config.resolve(labels, stage, run_config.stage_models(config, repo))
     branch = (status or {}).get("branch") or f"claude/issue-{number}-{slug(issue['title'])}"
 
     if not dry_run:
@@ -173,7 +192,9 @@ def record(ref, session_id):
     except (OSError, ValueError, KeyError):
         # No prepare in this container (recycled?): re-resolve the labels.
         labels = [label["name"] for label in st.gh(f"repos/{repo}/issues/{number}/labels?per_page=100")]
-        resolved = run_config.resolve(labels)
+        _, status, _ = st.find(repo, number)
+        stage = pick_stage(None, status)
+        resolved = run_config.resolve(labels, stage, run_config.load_stage_models(repo))
         meta = {"run": resolved["run"], "notes": resolved["notes"]}
     changes = {"session": session_id, "session_url": f"https://claude.ai/code/{session_id}", "run": meta["run"]}
     st.patch(repo, number, changes, notes=[f"⚠️ Run: {n}" for n in meta["notes"]])
@@ -191,7 +212,7 @@ def main(argv):
         print(f"recorded {rest[0]} on {ref}")
         return 0
     opts = {"orchestrator": None, "directive": "DESIGN", "notes": None, "redispatch": False, "inline": None,
-            "dry_run": False}
+            "dry_run": False, "stage": None}
     i = 0
     while i < len(rest):
         flag = rest[i]
@@ -204,6 +225,10 @@ def main(argv):
             opts["orchestrator"] = value
         elif flag == "--directive":
             opts["directive"] = value.upper()
+        elif flag == "--stage":
+            if value not in run_config.STAGES:
+                raise SystemExit("--stage must be design or build")
+            opts["stage"] = value
         elif flag == "--notes":
             opts["notes"] = sys.stdin.read() if value == "-" else open(value).read()
         else:
@@ -211,10 +236,13 @@ def main(argv):
         i += 2
     if not opts["orchestrator"]:
         raise SystemExit("--orchestrator <session id> is required")
-    if opts["directive"] not in ("DESIGN", "RESUME"):
-        raise SystemExit("--directive must be DESIGN or RESUME")
+    if opts["directive"] not in ("DESIGN", "RESUME", "BUILD"):
+        raise SystemExit("--directive must be DESIGN, RESUME or BUILD")
+    if opts["directive"] == "BUILD":
+        opts["redispatch"] = True
     args, meta = prepare(ref, **opts)
-    sys.stderr.write(f"{ref}: comment {meta['comment_id']}, model {args.get('model') or 'default'}, "
+    sys.stderr.write(f"{ref}: comment {meta['comment_id']}, stage {meta['run'].get('stage')}, "
+                     f"model {args.get('model') or 'default'}, "
                      f"prompt {len(args['prompt'])} B, system {len(args['append_system_prompt'])} B"
                      + "".join(f"\n  note: {n}" for n in meta["notes"]) + "\n")
     json.dump(args, sys.stdout, indent=1, ensure_ascii=False)
