@@ -459,7 +459,8 @@ def data_body(data):
         text = json.dumps(data, sort_keys=True, ensure_ascii=False)
         # `https:\/\/` is the same string to any JSON parser, and the cloud proxy,
         # which rewrites bare https://claude.ai/... URLs, leaves it alone.
-        text = text.replace("://", ":\\/\\/")
+        # Backticks become \u0060 so no value can close the ``` fence early.
+        text = text.replace("://", ":\\/\\/").replace("`", "\\u0060")
         body = f"{DATA_MARKER}\n```json\n{text}\n```"
         if len(body) <= DATA_MAX_CHARS or not data["recently_merged"]:
             return body
@@ -468,8 +469,9 @@ def data_body(data):
 
 
 def check_data_body(body):
-    """Raise RuntimeError unless the data comment's JSON block parses."""
-    match = re.search(r"```json\n(.*?)\n```", body, re.S)
+    """Raise RuntimeError unless the data comment's JSON block, read up to the
+    first closing fence the way a markdown reader would, parses."""
+    match = re.search(r"```json\n(.*?)```", body, re.S)
     if not match:
         raise RuntimeError("stored data comment has no JSON block")
     try:
