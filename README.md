@@ -100,10 +100,12 @@ labels pick the worker session's model and reasoning effort when it's started
 (the factory app's new-issue form sets them). No label = the default; changing
 them later only affects sessions started afterwards. Effort is validated and
 recorded but not applied yet, because the session API has no effort setting.
-Without a label, `models: {design: fable, build: opus}` in `bot.config.yml`
-picks the model per stage: a fable session triages and designs, and when the
-issue gets its build slot a fresh opus session takes over the build (quick-lane
-issues stay in their first session). The alias → model ID table lives in
+Without a label, `models: {design, build}` in `bot.config.yml` picks the model
+per stage. It's currently opus for both, so one session triages, designs and
+builds; when the two differ, a fresh session on the build model takes over at
+the build slot (quick-lane issues stay in their first session). Fable used too
+many tokens as the default designer; put `model:fable` on an issue to use it
+anyway. The alias → model ID table lives in
 `bin/run_config.py`; see CLAUDE.md for the details.
 
 ## Why this design (and not a script)
