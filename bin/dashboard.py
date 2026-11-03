@@ -287,6 +287,16 @@ def notes_for(issue, slots_full, holders, quick_free=False):
     return "waiting for a build slot" if slots_full else "next up"
 
 
+SESSION_URL = re.compile(r"https://claude\.ai/code/session_[A-Za-z0-9_-]+")
+
+
+def session_url_of(status):
+    """The status comment's session URL, without any junk the cloud proxy has
+    wrapped around it (it rewrites bare claude.ai URLs), or None."""
+    match = SESSION_URL.search(str(status.get("session_url") or ""))
+    return match.group(0) if match else None
+
+
 def project_state(project, settings):
     """Slot usage and the live issues of one project, in dashboard order, as plain data."""
     issues = [i for i in project["issues"] if live(i)]
@@ -309,7 +319,7 @@ def project_state(project, settings):
             "review_state": state, "revision": revision, "paused": issue["paused"], "next": issue["next"],
             "pinged": issue.get("ping", False),
             "pr": pr_of(issue), "preview": preview_of(issue) if issue["phase"] == "in-review" else None,
-            "session_url": status.get("session_url"),
+            "session_url": session_url_of(status),
             "progress": progress_of(issue),
             "estimate": estimate_of(issue),
             "lane": lane_of(issue),
@@ -446,11 +456,26 @@ def data_body(data):
     merged entries if it would be too long for a comment."""
     data = dict(data, recently_merged=list(data["recently_merged"]))
     while True:
-        body = f"{DATA_MARKER}\n```json\n{json.dumps(data, sort_keys=True, ensure_ascii=False)}\n```"
+        text = json.dumps(data, sort_keys=True, ensure_ascii=False)
+        # `https:\/\/` is the same string to any JSON parser, and the cloud proxy,
+        # which rewrites bare https://claude.ai/... URLs, leaves it alone.
+        text = text.replace("://", ":\\/\\/")
+        body = f"{DATA_MARKER}\n```json\n{text}\n```"
         if len(body) <= DATA_MAX_CHARS or not data["recently_merged"]:
             return body
         data["recently_merged"].pop()
         data["truncated"] = True
+
+
+def check_data_body(body):
+    """Raise RuntimeError unless the data comment's JSON block parses."""
+    match = re.search(r"```json\n(.*?)\n```", body, re.S)
+    if not match:
+        raise RuntimeError("stored data comment has no JSON block")
+    try:
+        json.loads(match.group(1))
+    except ValueError as error:
+        raise RuntimeError(f"stored data comment isn't valid JSON: {error}")
 
 
 def publish_data(data, number):
@@ -470,9 +495,12 @@ def publish_data(data, number):
     comments = gh(f"repos/{repo}/issues/{number}/comments?per_page=100")
     found = [c for c in comments if (c.get("body") or "").startswith(DATA_MARKER)]
     if found:
-        gh("-X", "PATCH", f"repos/{repo}/issues/comments/{found[0]['id']}", "--input", "-", input_text=body)
+        written = gh("-X", "PATCH", f"repos/{repo}/issues/comments/{found[0]['id']}", "--input", "-", input_text=body)
     else:
-        gh("-X", "POST", f"repos/{repo}/issues/{number}/comments", "--input", "-", input_text=body)
+        written = gh("-X", "POST", f"repos/{repo}/issues/{number}/comments", "--input", "-", input_text=body)
+    # Read it back: if the stored JSON doesn't parse, say so and don't cache, so the next run rewrites it.
+    stored = gh(f"repos/{repo}/issues/comments/{written['id']}")
+    check_data_body(stored.get("body") or "")
     os.makedirs(os.path.dirname(DATA_CACHE), exist_ok=True)
     json.dump({"data": stable, "issue": number, "published": datetime.now(timezone.utc).timestamp()}, open(DATA_CACHE, "w"))
     return "data published"
