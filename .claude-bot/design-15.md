@@ -33,7 +33,6 @@ restarted worker reads today.
      from PR activity, stop; don't touch the status phase"),
   2. `bin/dispatch.py prepare --redispatch --stage build --directive BUILD`,
      `create_session`, `record` (session, `run` for the build stage),
-  3. archives the design session.
   The new worker starts at Build (re-reads the issue, design PR and comments,
   re-subscribes to the PR). Same model for both stages → plain `BUILD`, no new
   session.
@@ -41,7 +40,12 @@ restarted worker reads today.
   straight to Build after re-reading everything. One short paragraph; older
   workers never get `HANDOFF`, because plan.py only emits it for issues whose
   `run` has a `stage` field (i.e. dispatched after this change).
-- Quick lane: skip the hand-off (one session, design model … see Q2).
+## Decisions (owner, rev 1)
+
+1. On for all: `defaults: models: {design: fable, build: opus}`.
+2. Quick lane: no hand-off; the triage session builds it on the design model.
+3. Fast-path issues hand off too (same rule as design-PR issues).
+4. The design session is left open at hand-off (not archived).
 
 ## What the owner sees
 
