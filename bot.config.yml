@@ -101,7 +101,7 @@ defaults:
   # stages; quick-lane issues are built in their design session. Leave this out
   # (or set `models: null` in a project) for one session on the default model.
   models:
-    design: fable
+    design: opus
     build: opus
 
 projects:

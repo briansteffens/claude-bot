@@ -96,8 +96,8 @@ changing phase labels that way, pass every other label (these included) along.
 | `effort:low` / `effort:medium` / `effort:high` / `effort:max` | Worker reasoning effort. Validated and recorded, but not applied yet: the session API has no effort setting |
 
 No label of a kind = the default. For the model that's the project's
-`models: {design, build}` stage default in `bot.config.yml` (fable for design,
-opus for build): when the two differ, `bin/plan.py` marks the issue's BUILD as a
+`models: {design, build}` stage default in `bot.config.yml` (currently opus for
+both, so no hand-off; `model:fable` still opts an issue in): when the two differ, `bin/plan.py` marks the issue's BUILD as a
 `handoff` and the orchestrator starts a fresh build session (directive `BUILD`)
 and tells the design session `HANDOFF`. A `model:` label pins both stages, and
 quick-lane issues are built in their design session. Without `models:`, it's
