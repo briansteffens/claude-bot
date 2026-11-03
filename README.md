@@ -100,8 +100,11 @@ labels pick the worker session's model and reasoning effort when it's started
 (the factory app's new-issue form sets them). No label = the default; changing
 them later only affects sessions started afterwards. Effort is validated and
 recorded but not applied yet, because the session API has no effort setting.
-The alias → model ID table lives in `bin/run_config.py`; see CLAUDE.md for the
-details.
+Without a label, `models: {design: fable, build: opus}` in `bot.config.yml`
+picks the model per stage: a fable session triages and designs, and when the
+issue gets its build slot a fresh opus session takes over the build (quick-lane
+issues stay in their first session). The alias → model ID table lives in
+`bin/run_config.py`; see CLAUDE.md for the details.
 
 ## Why this design (and not a script)
 
@@ -229,7 +232,7 @@ exercises the new behaviour before opening the PR.
 | `.claude/skills/tick/SKILL.md` | One orchestration pass |
 | `.claude/skills/work-issue/SKILL.md` | Worker playbook: design → build → PR → merge |
 | `.claude/skills/bot-setup/SKILL.md` | Setup and re-binding |
-| `bin/run_config.py` | `model:*` / `effort:*` labels → worker model; the alias → model ID table |
+| `bin/run_config.py` | `model:*` / `effort:*` labels and `models:` stage defaults → worker model; the alias → model ID table |
 | `bin/gather.py` / `bin/dashboard.py` | Snapshot of every project's bot issues / the dashboard rendered from it |
 | `bin/plan.py` | A tick's actions from the snapshot (finalize, SYNC, slots, dispatches); `--apply` makes the mechanical GitHub edits; `--test` self-test |
 | `bin/dispatch.py` | Status comment, labels and `create_session` arguments for a new worker |

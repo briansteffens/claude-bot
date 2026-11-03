@@ -95,7 +95,13 @@ changing phase labels that way, pass every other label (these included) along.
 | `model:opus` / `model:sonnet` / `model:haiku` / `model:fable` | Worker session runs on that model family's current model |
 | `effort:low` / `effort:medium` / `effort:high` / `effort:max` | Worker reasoning effort. Validated and recorded, but not applied yet: the session API has no effort setting |
 
-No label of a kind = the default. Two labels of a kind, or an unknown value: that
+No label of a kind = the default. For the model that's the project's
+`models: {design, build}` stage default in `bot.config.yml` (fable for design,
+opus for build): when the two differ, `bin/plan.py` marks the issue's BUILD as a
+`handoff` and the orchestrator starts a fresh build session (directive `BUILD`)
+and tells the design session `HANDOFF`. A `model:` label pins both stages, and
+quick-lane issues are built in their design session. Without `models:`, it's
+the session API's default. Two labels of a kind, or an unknown value: that
 kind falls back to the default and the status comment says so. What was used is
 recorded as `run` in the status JSON (`null` = default).
 

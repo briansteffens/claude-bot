@@ -8,27 +8,42 @@ app's new-issue form, or by hand):
   model:<alias>   alias one of the keys of MODELS below
   effort:<level>  level one of EFFORTS below
 
-No label of a kind means the default (create_session's own default, i.e. what
-dispatch did before these labels existed). More than one label of a kind, or a
-value not in the list, means that kind is ignored (default used) and a note
-says why.
+No label of a kind means the default. For the model that's the per-stage
+default from bot.config.yml (`models: {design: <alias>, build: <alias>}`, in
+`defaults:` or a project), and with none configured, create_session's own
+default (what dispatch did before these labels existed). More than one label of
+a kind, or a value not in the list, means that kind is ignored (default used)
+and a note says why.
+
+Stages: a worker session is started for the `design` stage (triage, design
+round) and, when the build model differs from the design session's model, a
+fresh session is started for the `build` stage at BUILD (bin/plan.py marks it
+`handoff`). A `model:` label pins both stages to one model, so no hand-off.
+Quick-lane issues are built in their design session, so no hand-off either.
 
 MODELS is the single alias -> model ID table: when a new model version ships,
 change its line here. Labels hold aliases, never IDs.
 
 Usage:
-  bin/run_config.py [LABEL ...]       resolve these labels (e.g. claude model:opus)
-  bin/run_config.py --issue o/r#n     fetch the issue's labels with `gh api` first
+  bin/run_config.py [--stage S] [--repo o/r] [LABEL ...]
+                                      resolve these labels (e.g. claude model:opus);
+                                      --repo applies that project's `models:` from
+                                      bot.config.yml (without it, `defaults:`'s)
+  bin/run_config.py [--stage S] --issue o/r#n
+                                      fetch the issue's labels with `gh api` first
   bin/run_config.py --test            run the self-test
 
 Prints JSON:
-  {"run": {"model": "opus", "effort": null},   -> the status JSON's "run"
+  {"run": {"model": "opus", "effort": null, "stage": "design"},
+                                              -> the status JSON's "run" (stage only
+                                                 when one was given)
    "model_id": "claude-opus-5-5",              -> create_session's `model` (omit if null)
    "effort": null,                             -> create_session's effort (omit if null)
    "ignored": [],                              -> kinds ignored (also in run.ignored if any)
    "notes": ["..."]}                           -> lines for the status comment
 """
 import json
+import os
 import subprocess
 import sys
 
@@ -49,6 +64,27 @@ EFFORT_SUPPORTED = False
 
 KINDS = {"model": tuple(MODELS), "effort": EFFORTS}
 
+STAGES = ("design", "build")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def stage_models(config, repo=None):
+    """The `models:` mapping that applies to a project ({} if none): the
+    project's own, else `defaults:`'s. Unknown stages/aliases are dropped."""
+    config = config or {}
+    found = (config.get("defaults") or {}).get("models")
+    for project in config.get("projects") or []:
+        if repo and project.get("repo") == repo and "models" in project:
+            found = project["models"]
+    if not isinstance(found, dict):
+        return {}
+    return {stage: alias for stage, alias in found.items() if stage in STAGES and alias in MODELS}
+
+
+def load_stage_models(repo=None):
+    import yaml
+    return stage_models(yaml.safe_load(open(os.path.join(ROOT, "bot.config.yml"))), repo)
+
 
 def pick(labels, kind):
     """Return (value or None, note or None) for one label kind."""
@@ -65,10 +101,15 @@ def pick(labels, kind):
     return values[0], None
 
 
-def resolve(labels):
-    """Resolve a list of label names into the run config. Pure: no caching."""
+def resolve(labels, stage=None, models=None):
+    """Resolve a list of label names into the run config. Pure: no caching.
+
+    stage: "design" / "build" / None; models: the project's stage -> alias
+    defaults (stage_models()), used when no valid model: label is set."""
     labels = list(labels)
     model, model_note = pick(labels, "model")
+    if model is None and stage:
+        model = (models or {}).get(stage)
     effort, effort_note = pick(labels, "effort")
     notes = [n for n in (model_note, effort_note) if n]
     ignored = [kind for kind, note in (("model", model_note), ("effort", effort_note)) if note]
@@ -77,6 +118,8 @@ def resolve(labels):
                      "so the default effort is used.")
         effort = None
     run = {"model": model, "effort": effort}
+    if stage:
+        run["stage"] = stage
     if ignored:
         run["ignored"] = ignored
     return {
@@ -178,6 +221,36 @@ def self_test():
     check("labels added after dispatch: recorded run unchanged", at_dispatch["run"], {"model": None, "effort": None})
     check("labels added after dispatch: next dispatch uses them", resolve(later_labels)["model_id"], "claude-haiku-5-5")
 
+    models = {"design": "fable", "build": "opus"}
+    r = resolve(base, "design", models)
+    check("stage default: design -> fable", (r["run"], r["model_id"], r["notes"]),
+          ({"model": "fable", "effort": None, "stage": "design"}, "claude-fable-5-1", []))
+    r = resolve(base, "build", models)
+    check("stage default: build -> opus", (r["run"], r["model_id"]),
+          ({"model": "opus", "effort": None, "stage": "build"}, "claude-opus-5-5"))
+    r = resolve(base + ["model:sonnet"], "design", models)
+    check("label beats stage default (design)", r["model_id"], "claude-sonnet-5-5")
+    r = resolve(base + ["model:sonnet"], "build", models)
+    check("label beats stage default (build)", r["model_id"], "claude-sonnet-5-5")
+    r = resolve(base + ["model:gpt-4"], "build", models)
+    check("invalid label: stage default used, noted", (r["run"]["model"], r["ignored"]), ("opus", ["model"]))
+    r = resolve(base, "build", {"design": "fable"})
+    check("stage without a default: create_session default", (r["run"], r["model_id"]),
+          ({"model": None, "effort": None, "stage": "build"}, None))
+    r = resolve(base, "design", None)
+    check("no models config: as before, stage recorded", (r["run"], r["model_id"]),
+          ({"model": None, "effort": None, "stage": "design"}, None))
+
+    cfg = {"defaults": {"models": {"design": "fable", "build": "opus"}},
+           "projects": [{"repo": "o/a"}, {"repo": "o/b", "models": {"build": "sonnet"}},
+                        {"repo": "o/c", "models": None}]}
+    check("stage_models: defaults apply", stage_models(cfg, "o/a"), {"design": "fable", "build": "opus"})
+    check("stage_models: project overrides whole mapping", stage_models(cfg, "o/b"), {"build": "sonnet"})
+    check("stage_models: project models: null turns it off", stage_models(cfg, "o/c"), {})
+    check("stage_models: unknown aliases/stages dropped",
+          stage_models({"defaults": {"models": {"design": "gpt", "build": "opus", "x": "opus"}}}), {"build": "opus"})
+    check("stage_models: no config", stage_models({}), {})
+
     print(f"\n{'all passed' if not failures else str(len(failures)) + ' FAILED'}")
     return 1 if failures else 0
 
@@ -185,11 +258,23 @@ def self_test():
 def main(argv):
     if "--test" in argv:
         return self_test()
+    stage = repo = None
+    argv = list(argv)
+    while argv[:1] and argv[0] in ("--stage", "--repo"):
+        if argv[0] == "--stage":
+            stage = argv[1]
+            if stage not in STAGES:
+                raise SystemExit(f"--stage must be one of {', '.join(STAGES)}")
+        else:
+            repo = argv[1]
+        argv = argv[2:]
     if argv[:1] == ["--issue"]:
+        repo = repo or argv[1].split("#", 1)[0]
         labels = issue_labels(argv[1])
     else:
         labels = argv
-    print(json.dumps(resolve(labels)))
+    models = load_stage_models(repo) if stage else {}
+    print(json.dumps(resolve(labels, stage, models)))
     return 0
 
 

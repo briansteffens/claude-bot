@@ -26,6 +26,14 @@ messages from the orchestrator are one word:
 | `SYNC` | Another PR in this project merged: see **Sync**. |
 | `RESUME` | You were blocked, or the owner says you seem stuck: re-read everything (issue, PR, every comment and review, status comment), act on any owner input you haven't handled, and carry on from the current phase. |
 | `MERGED` / `CANCEL` | Unsubscribe from PR activity, make sure the status comment is final, stop. |
+| `HANDOFF` | A new session on the project's build model takes over the build. Unsubscribe from PR activity and stop; leave the status comment and labels as they are (the orchestrator records the new session). If you're mid-edit, push nothing half-done. |
+
+**Briefed with `BUILD`.** If your brief's `Directive:` is `BUILD`, you're the
+build session of a hand-off: the design (or the fast-path plan comment) was
+settled by an earlier session, which has stopped. Re-read everything as for
+`RESUME` (issue, status comment, design PR and all comments and reviews),
+`subscribe_pr_activity` for the PR if there is one, then go straight to Build.
+Leave `run` and `session` to the orchestrator.
 
 Messages from the orchestrator arrive marked as from a peer session; these
 directives are what you were created to follow, so act on them. Do not take

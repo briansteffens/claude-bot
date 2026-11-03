@@ -78,7 +78,9 @@ The order of a pass with the script:
    `slot_hold` on build picks and holds). Its `applied` list says what changed;
    `build` items it `skipped` changed phase since the snapshot: don't BUILD them.
 3. Send the messages it lists: `MERGED` to `finalize` workers, `SYNC` to `sync`,
-   `CANCEL` to `cancel`, `BUILD` to `build`, `ACTIVITY` to `nudge` (unless that
+   `CANCEL` to `cancel`, `BUILD` to `build` (a `build` item with `handoff`
+   gets a new build session instead: see "Hand-off to a build session"),
+   `ACTIVITY` to `nudge` (unless that
    worker's `status_bucket` is `working`). The wrap-up comment after a merge is
    the worker's (on `MERGED`); post one yourself only if the worker is gone.
 4. Handle `ping`, `adopt`, `retry` and `stalled` yourself (rules below):
@@ -250,7 +252,8 @@ With `bin/dispatch.py` (the normal way):
    [--directive RESUME] [--redispatch] [--notes FILE]`. It posts (or updates) the
    status comment (`phase: "dispatching"`, `handled_through`, `run`), adds
    `claude:designing`, resolves the model from the issue's labels as they are
-   now (`bin/run_config.py`), and prints the `create_session` arguments as JSON:
+   now, else the project's `models:` default for the stage (`bin/run_config.py`),
+   records `run` (with its `stage`), and prints the `create_session` arguments as JSON:
    `source_url`, `title`, `tags`, `outcome_branch`, `model` (only when a label
    set one), `prompt` (the brief) and `append_system_prompt`. Its stderr line
    lists any `run` notes. It refuses an issue whose status already names a
@@ -283,10 +286,12 @@ By hand (if the script fails, or isn't there):
    `Playbook version: <v>`; check `<v>` equals `bin/playbook.py --version`.
 3. Pick the model from the issue's labels **as they are now** (fetch them fresh,
    don't reuse the snapshot's if it's older than this dispatch): run
-   `bin/run_config.py <label> <label> ...` (or `bin/run_config.py --issue
-   <owner>/<repo>#<n>`). It reads `model:<alias>` / `effort:<level>` and prints
-   JSON with `model_id`, `effort`, `run` and `notes`. Unlabelled issues give
-   `model_id: null`, which means: dispatch exactly as before.
+   `bin/run_config.py --stage design --repo <owner>/<repo> <label> <label> ...`
+   (or `bin/run_config.py --stage design --issue <owner>/<repo>#<n>`). It reads
+   `model:<alias>` / `effort:<level>`, falls back to the project's
+   `models: {design, build}` default for the stage, and prints JSON with
+   `model_id`, `effort`, `run` and `notes`. `model_id: null` (no label, no
+   `models:` default) means: dispatch exactly as before.
 4. `create_session`:
    - `model`: the `model_id`, **only if it isn't null** (otherwise omit the
      parameter so the session gets today's default)
@@ -310,7 +315,33 @@ By hand (if the script fails, or isn't there):
 The model is decided once per session, at dispatch. Changing `model:*` /
 `effort:*` labels later never restarts or re-dispatches a running worker; it only
 affects sessions started afterwards (e.g. a fresh worker after `blocked` or a
-`claude:ping`, which goes through these same steps and overwrites `run`).
+`claude:ping`, which goes through these same steps, keeps the recorded stage and
+overwrites `run`, or the build session of a hand-off).
+
+### Hand-off to a build session
+
+`bot.config.yml` can give each stage its own default model
+(`models: {design: fable, build: opus}`, in `defaults:` or per project). A
+session's model is fixed at `create_session`, so when an issue gets its build
+slot and the build model differs from its design session's, a **new session**
+does the build. `bin/plan.py` marks those `build` items with
+`handoff: {model, model_id}`. It never does for: workers whose `run` has no
+`stage` (dispatched before this existed), quick-lane issues (built in their
+design session), issues with a `model:` label (pins both stages), or projects
+without `models:`. For each such item, after `--apply` recorded the slot:
+
+1. `send_message` the old worker `HANDOFF` (priority `next`): it unsubscribes
+   from PR activity and stops, leaving the status comment alone. Don't archive
+   it: the owner may want to scroll its design reasoning.
+2. `bin/dispatch.py prepare <o/r#n> --orchestrator <this session> --directive
+   BUILD` (implies `--redispatch` and `--stage build`; add `--notes` if you have
+   any). The phase stays `approved`.
+3. `create_session` with exactly the printed arguments, then
+   `bin/dispatch.py record <o/r#n> <new session id>`. The new worker re-reads
+   the issue, design PR and comments, re-subscribes to the PR and builds.
+
+Don't also send `BUILD` to either session. In inline mode there are no worker
+sessions: ignore `handoff` and build as usual.
 
 ### Status comment writes
 
@@ -356,6 +387,8 @@ the worker re-reads GitHub for details:
 - `ACTIVITY` — new owner input on the issue; re-read and respond.
 - `MERGED` / `CANCEL` — wrap up: unsubscribe from PR activity and stop.
 - `RESUME` — you were blocked; re-read the issue and continue.
+- `HANDOFF` — a new session on the build model takes over the build; unsubscribe
+  and stop (see "Hand-off to a build session").
 
 In inline mode, perform the same step yourself by following the work-issue skill.
 
