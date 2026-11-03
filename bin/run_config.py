@@ -31,6 +31,11 @@ Usage:
                                       bot.config.yml (without it, `defaults:`'s)
   bin/run_config.py [--stage S] --issue o/r#n
                                       fetch the issue's labels with `gh api` first
+  bin/run_config.py --orchestrator [--current MODEL]
+                                      the orchestrator's own models from
+                                      bot.config.yml's `orchestrator:` block; with
+                                      --current (this session's model, from
+                                      get_session), whether it matches
   bin/run_config.py --test            run the self-test
 
 Prints JSON:
@@ -41,6 +46,13 @@ Prints JSON:
    "effort": null,                             -> create_session's effort (omit if null)
    "ignored": [],                              -> kinds ignored (also in run.ignored if any)
    "notes": ["..."]}                           -> lines for the status comment
+
+--orchestrator prints:
+  {"model": "sonnet", "model_id": "claude-sonnet-5-5",   -> what this session should run on
+   "subagents": "opus",                                    -> Agent tool `model` for subagents
+   "current": "claude-opus-5-5", "matches": false,         -> only with --current
+   "notes": ["..."]}                                       -> a mismatch reminder for the report
+Missing block or unknown alias: that key is null (no check / Agent default).
 """
 import json
 import os
@@ -84,6 +96,47 @@ def stage_models(config, repo=None):
 def load_stage_models(repo=None):
     import yaml
     return stage_models(yaml.safe_load(open(os.path.join(ROOT, "bot.config.yml"))), repo)
+
+
+ORCHESTRATOR_KEYS = ("model", "subagents")
+
+
+def orchestrator_models(config):
+    """{"model": alias|None, "subagents": alias|None} from the `orchestrator:`
+    block. A missing block, key, or unknown alias gives None for that key."""
+    block = (config or {}).get("orchestrator")
+    if not isinstance(block, dict):
+        block = {}
+    return {key: block.get(key) if block.get(key) in MODELS else None for key in ORCHESTRATOR_KEYS}
+
+
+def family(model):
+    """The alias a model string belongs to ('claude-opus-5-5[1m]' -> 'opus'),
+    or None. Accepts aliases, IDs, and IDs with a context-window suffix."""
+    name = (model or "").split("[", 1)[0].strip().lower()
+    for alias in MODELS:
+        if name == alias or alias in name.split("-"):
+            return alias
+    return None
+
+
+def orchestrator_check(config, current=None):
+    """The --orchestrator output for this config and (optionally) the model this
+    session runs on now."""
+    models = orchestrator_models(config)
+    want = models["model"]
+    out = {"model": want, "model_id": MODELS[want] if want else None,
+           "subagents": models["subagents"], "notes": []}
+    if current is not None:
+        out["current"] = current
+        have = family(current)
+        out["matches"] = want is None or have == want
+        if not out["matches"]:
+            out["notes"].append(
+                f"⚠️ Orchestrator runs on `{current}`, config says `{want}` ({MODELS[want]}). "
+                f"Switch with `/model {want}` in this session, or start a new session on "
+                f"{MODELS[want]} and run /bot-setup there (it moves the heartbeat).")
+    return out
 
 
 def pick(labels, kind):
@@ -251,6 +304,31 @@ def self_test():
           stage_models({"defaults": {"models": {"design": "gpt", "build": "opus", "x": "opus"}}}), {"build": "opus"})
     check("stage_models: no config", stage_models({}), {})
 
+    check("orchestrator_models: configured", orchestrator_models({"orchestrator": {"model": "sonnet", "subagents": "opus"}}),
+          {"model": "sonnet", "subagents": "opus"})
+    check("orchestrator_models: no block", orchestrator_models({}), {"model": None, "subagents": None})
+    check("orchestrator_models: block null", orchestrator_models({"orchestrator": None}), {"model": None, "subagents": None})
+    check("orchestrator_models: unknown alias dropped",
+          orchestrator_models({"orchestrator": {"model": "claude-sonnet-5-5", "subagents": "opus"}}),
+          {"model": None, "subagents": "opus"})
+    for name, want in (("claude-opus-5-5", "opus"), ("claude-opus-5-5[1m]", "opus"), ("opus", "opus"),
+                       ("claude-sonnet-5-5", "sonnet"), ("claude-opus-4-8[1m]", "opus"),
+                       ("claude-fable-5-1", "fable"), ("Claude-Haiku-5-5", "haiku"), ("gpt-4", None),
+                       ("", None), (None, None)):
+        check(f"family({name!r}) -> {want}", family(name), want)
+    ocfg = {"orchestrator": {"model": "sonnet", "subagents": "opus"}}
+    r = orchestrator_check(ocfg)
+    check("orchestrator_check: no --current, no verdict",
+          r, {"model": "sonnet", "model_id": "claude-sonnet-5-5", "subagents": "opus", "notes": []})
+    r = orchestrator_check(ocfg, "claude-sonnet-5-5")
+    check("orchestrator_check: match", (r["matches"], r["notes"]), (True, []))
+    r = orchestrator_check(ocfg, "claude-opus-5-5[1m]")
+    check("orchestrator_check: mismatch noted with the fix",
+          (r["matches"], len(r["notes"]), "/model sonnet" in r["notes"][0]), (False, 1, True))
+    r = orchestrator_check({}, "claude-opus-5-5")
+    check("orchestrator_check: nothing configured always matches",
+          (r["model"], r["subagents"], r["matches"], r["notes"]), (None, None, True, []))
+
     print(f"\n{'all passed' if not failures else str(len(failures)) + ' FAILED'}")
     return 1 if failures else 0
 
@@ -258,6 +336,16 @@ def self_test():
 def main(argv):
     if "--test" in argv:
         return self_test()
+    if argv[:1] == ["--orchestrator"]:
+        import yaml
+        current = None
+        if argv[1:2] == ["--current"]:
+            if len(argv) < 3:
+                raise SystemExit("--current needs a model (this session's, from get_session)")
+            current = argv[2]
+        config = yaml.safe_load(open(os.path.join(ROOT, "bot.config.yml")))
+        print(json.dumps(orchestrator_check(config, current)))
+        return 0
     stage = repo = None
     argv = list(argv)
     while argv[:1] and argv[0] in ("--stage", "--repo"):

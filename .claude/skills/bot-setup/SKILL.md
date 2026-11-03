@@ -14,6 +14,13 @@ Re-runnable: every step checks before it creates.
    - `sessions` needs `create_session`, `send_message`, `create_trigger` (cloud).
    - `inline` needs `gh` authenticated (`gh auth status`) or the GitHub MCP tools.
 
+   **Model.** `get_session` (no id), then `bin/run_config.py --orchestrator
+   --current <session_context.model>`. If it doesn't match `orchestrator.model`,
+   tell the owner (the printed note) before going on: a session can't change
+   its own model, so they either switch it with `/model <alias>` here, or start
+   a new session on that model and run `/bot-setup` there instead (step 6 moves
+   the heartbeat). Carry on if they say to.
+
 3. **Repo access (cloud).** For each project, `add_repo` with `access: "push"` so
    this session can label and comment. Relay any access error verbatim with the
    remedy it names, and skip that project until fixed.
