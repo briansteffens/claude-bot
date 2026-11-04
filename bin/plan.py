@@ -39,8 +39,10 @@ phase labels, closing a merged issue). It never messages a worker and never
 dispatches: the orchestrator does those from the output.
 """
 import copy
+import fnmatch
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -55,6 +57,46 @@ HOLDING = ("building", "in-review")
 PRE_BUILD = ("dispatching", "designing", "needs-input", "approved")
 STALL_MINUTES = 30
 FUTURE_SLACK = timedelta(minutes=5)
+
+
+DOC_FILES = {"README.md", "research/NOTES.md"}
+PATH_RE = re.compile(r"[A-Za-z0-9_./*{},-]+\.(?:ts|tsx|js|mjs|cjs|css|md|json|py|yml|yaml|html|bin|sh)\b")
+
+
+def _expand_braces(token):
+    match = re.search(r"\{([^{}]*)\}", token)
+    if not match:
+        return [token]
+    out = []
+    for part in match.group(1).split(","):
+        out += _expand_braces(token[:match.start()] + part + token[match.end():])
+    return out
+
+
+def footprint_paths(status):
+    """File paths named in a status footprint, or None when it names none (unknown).
+    Docs that nearly every PR edits additively (README, notes) are left out."""
+    files = (status.get("footprint") or {}).get("files") or []
+    paths = set()
+    for entry in files:
+        for token in PATH_RE.findall(str(entry)):
+            for path in _expand_braces(token):
+                if path and path not in DOC_FILES:
+                    paths.add(path)
+    return paths or None
+
+
+def footprints_overlap(merged, holder):
+    """Whether a SYNC is worth sending: a merged PR and the holder share a file.
+    Unknown footprints (None) count as overlapping, so the worker syncs to be safe."""
+    if holder is None or not merged or any(m is None for m in merged):
+        return True
+    for m in merged:
+        for a in m:
+            for b in holder:
+                if a == b or fnmatch.fnmatch(a, b) or fnmatch.fnmatch(b, a):
+                    return True
+    return False
 
 
 def parse_time(stamp):
@@ -255,8 +297,10 @@ def plan_project(project, settings, now, regular_pool=None):
     finalized = {f["issue"] for f in out["finalize"]}
     live = [i for i in issues if i["number"] not in gone]
     if finalized:
+        merged_paths = [footprint_paths(status_of(i)) for i in issues if i["number"] in finalized]
         out["sync"] = [{"issue": i["number"], "session": session_of(i)} for i in live
-                       if i["phase"] in HOLDING and session_of(i)]
+                       if i["phase"] in HOLDING and session_of(i)
+                       and footprints_overlap(merged_paths, footprint_paths(status_of(i)))]
 
     active = [i for i in live if not i["paused"]]
     holders = [i for i in live if i["phase"] in HOLDING]
@@ -570,6 +614,21 @@ def self_test():
     check("merge: finalize + SYNC to the other holders",
           ([f["issue"] for f in p["finalize"]], [s["issue"] for s in p["sync"]]), ([1], [2, 3]))
     check("merged holder no longer holds a slot", p["slots"]["regular"], "2/2")
+
+    fp = lambda *files: {"files": list(files)}
+    p = run([fixture(1, "in-review", session="s1", _pr={"number": 9, "merged": True},
+                     footprint=fp("src/world/streets.ts (roadMaterial)", "README.md")),
+             fixture(2, "building", session="s2", footprint=fp("src/world/streets.ts (stream)")),
+             fixture(3, "building", session="s3", footprint=fp("src/ui/hud.ts", "README.md")),
+             fixture(4, "building", session="s4", footprint=fp("src/world/stations/{a,b}.ts (new)", "src/game/game.ts")),
+             fixture(5, "building", session="s5")])
+    check("SYNC only to overlapping or unknown footprints (README ignored)",
+          [s["issue"] for s in p["sync"]], [2, 5])
+
+    p = run([fixture(1, "in-review", session="s1", _pr={"number": 9, "merged": True},
+                     footprint=fp("src/world/stations/*.ts (signs)")),
+             fixture(2, "building", session="s2", footprint=fp("src/world/{stations/kit,x}.ts"))])
+    check("SYNC overlap handles globs and brace expansion", [s["issue"] for s in p["sync"]], [2])
 
     p = run([fixture(7, "designing", state="closed", session="s7")])
     check("closed without merge: cancel", [c["issue"] for c in p["cancel"]], [7])
