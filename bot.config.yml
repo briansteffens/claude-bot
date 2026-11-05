@@ -80,6 +80,11 @@ defaults:
   #   pages        - push the build to the `previews` branch under pr-<n>/; the
   #                  repo's Pages workflow publishes it at
   #                  <owner>.github.io/<repo>/previews/pr-<n>/ (see README)
+  #   cloudflare   - `wrangler pages deploy` the build to the Cloudflare Pages
+  #                  project named by `cloudflare_project` (project setting),
+  #                  branch pr-<n>; links https://pr-<n>.<cloudflare_project>.pages.dev/.
+  #                  Needs CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID in the
+  #                  cloud environment (see README)
   #   instructions - exact commands to run it locally, plus captured output/screenshots
   #   deploy       - CI deploys every pushed branch to `preview_url`; the worker
   #                  waits for the deploy of its commit, then links that URL
@@ -107,28 +112,30 @@ defaults:
 projects:
   - repo: briansteffens/minefield-commander
     build_slots: 4
-    preview: pages
+    preview: cloudflare
+    cloudflare_project: minefield-commander-previews
     notes: |
       3D Minesweeper in TypeScript + three.js, bundled by esbuild into one
       self-contained HTML file. `npm ci`, then `npm run typecheck`, `npm test`
       (vitest), `npm run build`. The build writes dist/index.html (standalone)
       and dist/artifact.html (Artifact fragment, no longer used for previews).
-      For the PR preview, push dist/index.html to the `previews` branch as
-      pr-<n>/index.html (the Pages workflow publishes it at /previews/pr-<n>/). Pages deploys main via .github/workflows/pages.yml;
+      For the PR preview, upload a folder holding only dist/index.html (copy
+      it to e.g. /tmp/preview-<n>/index.html; dist/artifact.html stays out).
+      Pages deploys main via .github/workflows/pages.yml;
       there is no PR CI, so run typecheck/test/build yourself before pushing.
       README.md documents the rules in detail: update it when gameplay changes.
   - repo: briansteffens/bay-area-pirates
     build_slots: 8
     design_ahead: 8
-    preview: pages
+    preview: cloudflare
+    cloudflare_project: bay-area-pirates-previews
     notes: |
       First/third-person boating RPG on a real-terrain San Francisco Bay, in
       TypeScript + three.js, built with Vite. `npm ci`, then `npm run typecheck`
       and `npm run build` (dist/ is a static site with relative paths: an
       index.html plus JS chunks and public/data/height.png + chart.png, ~5 MB).
       There is no test runner, so verify by playing it in headless Chromium.
-      For the preview, push dist/ to the `previews` branch under pr-<n>/ (the
-      Pages workflow publishes it at /previews/pr-<n>/; vite base is './'). Don't regenerate the heightmap
+      For the preview, upload dist/ (vite base is './'). Don't regenerate the heightmap
       (tools/build_heightmap.py downloads terrain tiles) unless the issue asks.
       Pages deploys the default branch via .github/workflows/pages.yml; there
       is no PR CI. README.md documents controls and features: keep it current.

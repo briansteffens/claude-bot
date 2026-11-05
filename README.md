@@ -205,6 +205,25 @@ click or GitHub's auto-merge enforcing rules you set.
     branch.
 
   Merged and closed PRs' folders are deleted from `previews` when the bot finalizes.
+- `cloudflare` — the worker uploads its build straight to a Cloudflare Pages project
+  (`cloudflare_project: <name>` on the project) with
+  `wrangler pages deploy <dist> --branch pr-<n>` and links the per-PR alias
+  `https://pr-<n>.<name>.pages.dev/`, plus the immutable per-deployment URL for
+  that commit. It's like `pages` (a plain public page) but has no shared branch,
+  no workflow runs or Actions minutes, and no deploy queue or cache wait: the
+  preview is live when the upload returns. You set up once, in this order:
+  1. create the project: `wrangler pages project create <name> --production-branch main`;
+  2. create an API token with **Cloudflare Pages: Edit** on the account;
+  3. add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the claude-bot
+     cloud environment (worker sessions inherit it).
+
+  `/bot-setup` checks these and never creates them. A worker that finds a
+  variable missing goes `blocked` and names it. Merged and closed PRs'
+  `pr-<n>` deployments are deleted when the bot finalizes. Limits (Cloudflare
+  Pages docs, Free plan): 20,000 files per site (wrangler upload), 25 MiB per
+  file. The docs describe the 500 builds a month as Git-integration builds
+  ("each time you push new code to your Git repository"). They don't say
+  whether direct uploads count.
 - `instructions` — copy-paste run commands plus captured output.
 
 In every mode the worker loads the build in headless Chromium with Playwright and
