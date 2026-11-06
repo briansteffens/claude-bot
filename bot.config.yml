@@ -31,7 +31,7 @@ build_scope: per-project
 #               tool (the parallelism / estimate check), which need judgement.
 # Worker sessions are chosen separately: `models:` under defaults, and labels.
 orchestrator:
-  model: sonnet
+  model: opus
   subagents: opus
 
 # Defaults applied to every project unless the project overrides them.
