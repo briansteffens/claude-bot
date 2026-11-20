@@ -457,6 +457,32 @@ footprint and avoid drive-by refactors or reformatting of shared files.
      vehicle doesn't call for driving-physics tests). For a quick-lane spawn
      entry: it loads, it's at the right place and heading, it renders, one
      basic interaction (board/enter/use it) works, no new console errors.
+   - **Flicker check (3D projects).** Do this check if the diff adds or
+     changes meshes, materials, decals, overlays, shadows, the camera near or
+     far plane, or anything that moves one model against another model (doors,
+     vehicles at a platform). Do not do it for projects without 3D rendering,
+     or for diffs that do not change what is rendered.
+     1. Get the tool `bin/flicker-check.mjs` from the same repo and commit as
+        this playbook: in the playbook URL in your system prompt, replace
+        `.claude/skills/work-issue/SKILL.md` with `bin/flicker-check.mjs`. If
+        your system prompt has no such URL, use the `main` branch.
+     2. Write a driver module outside the repo (the header of the tool tells
+        the format). In `setup`, freeze the game clock and randomness. Add one
+        scenario for each spot that the diff touches. In each frame, move the
+        camera or the character a very small distance along a straight line,
+        or step the animation (door opens, car pulls in) by a small time step.
+     3. Run `node flicker-check.mjs --url <local build> --driver <driver>`. It
+        gives the percentage of pixels that oscillate (A → B → A) and a heat
+        map PNG for each scenario.
+     4. If a scenario shows `NOT FROZEN`, fix the driver and run it again.
+     5. If a scenario shows `FLICKER`, read the heat map. If the diff caused
+        the flicker, fix it (`polygonOffset`, remove coplanar faces, move the
+        surfaces apart, tighten near/far) and run the check again.
+     6. If the flicker was there before the diff, do not fix it. Put the
+        scenario, the score and the heat map in the PR Notes.
+     Write the result in "How I verified it": the spots, the peak score, and
+     the heat map of each finding. The quick lane also does this check, in its
+     10-minute box.
    - **Overlap the deploy wait** (`pages`, `deploy`): push the preview first,
      then play-check the local build (e.g. `npx vite preview`, or the built
      files over a local static server) while it deploys. Once it's live, just
@@ -486,6 +512,7 @@ Closes #<n>
 ## How I verified it
 - tests: ...
 - played it: what I did in the headless browser and what happened
+- flicker: spots checked and peak score (3D changes only)
 
 ## Notes
 Deviations from the design or assumptions made, follow-up ideas.

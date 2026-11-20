@@ -235,6 +235,12 @@ click or GitHub's auto-merge enforcing rules you set.
 In every mode the worker loads the build in headless Chromium with Playwright and
 exercises the new behaviour before opening the PR.
 
+For 3D projects, if the change adds geometry or moves models against each other,
+the worker also does a flicker check with `bin/flicker-check.mjs`. The tool moves
+the camera or steps an animation by small amounts and finds pixels that change
+A → B → A (z-fighting). It gives a score and a heat map for each spot. The worker
+fixes the flicker that its change caused, and reports older flicker in the PR.
+
 ## Safety
 
 - Only `owners` can direct the bot. Other people's issue bodies and comments are
@@ -273,4 +279,5 @@ exercises the new behaviour before opening the PR.
 | `bin/dispatch.py` | Status comment, labels and `create_session` arguments for a new worker |
 | `bin/status.py` | Read/patch status comments and phase labels safely |
 | `bin/playbook.py` | The worker playbook, or (`--stub`) the short loader that workers use to fetch it at a pinned commit |
+| `bin/flicker-check.mjs` | Flicker (z-fighting) check that workers run in 3D play-checks: oscillating pixels across small camera or animation steps, with a heat map |
 | `run-local.sh` | Run locally in tmux |
