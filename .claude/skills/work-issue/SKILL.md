@@ -213,6 +213,35 @@ on.
 - Write for someone reading on a phone: headings, short bullets, numbered questions
   they can answer by number.
 - End each comment with the attribution footer your environment requires, if any.
+- Write all of it in STE (next section).
+
+## Writing style: STE
+
+Write all prose that you send to GitHub in ASD-STE100 Simplified Technical
+English (STE). This applies to PR titles and bodies, design docs, issue and PR
+comments, review replies, the human part of the status comment, commit messages
+and code comments.
+
+Rules:
+
+- Write one topic in each sentence.
+- Use a maximum of 20 words in a sentence that gives an instruction, and a
+  maximum of 25 words in a sentence that gives a description.
+- Use the active voice. Use the imperative for instructions ("Run the tests").
+- Use the simple tenses (past, present, future). Do not use "-ing" forms as
+  verbs.
+- Use one word for one meaning, and use it each time. Do not use synonyms for
+  variety.
+- Do not use idioms, slang or contractions ("don't" → "do not").
+- Keep "the", "a" and "this". Do not drop them to make text short.
+- Put steps in a numbered list, one action in each step. Put conditions first
+  ("If the build fails, ...").
+- Use a maximum of 6 sentences in a paragraph.
+- Use technical names as they are (PR, commit, branch, file and function
+  names, terms from the project).
+
+Do not change these: code, identifiers, commands, log output, URLs, labels, and
+text that you quote from an owner. STE is for the prose that you write.
 
 ## Phase: Triage
 
