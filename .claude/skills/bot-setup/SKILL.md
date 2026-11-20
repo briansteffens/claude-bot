@@ -65,6 +65,12 @@ Re-runnable: every step checks before it creates.
    - `preview: pages` → the repo's Pages workflow also publishes the `previews`
      branch under `/previews/`, and a push to `previews` alone redeploys (README
      "Playable previews"). If not, suggest the owner queue an issue for it.
+   - `preview: cloudflare` → `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+     are set in this session's environment (check they're non-empty; never
+     print them), the project has `cloudflare_project`, and that Pages project
+     exists: `npx wrangler@4 pages project list` lists it. Otherwise tell the
+     owner what to add (README "Playable previews"); don't create the project
+     or the token yourself.
    - The default branch's CI is green (a red base blocks every PR).
 
 6. **Heartbeat (sessions mode).** `list_triggers` and look for `claude-bot heartbeat`.

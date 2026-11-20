@@ -396,7 +396,7 @@ def model(snapshot):
         slots, items = project_state(project, settings)
         sections.append({
             "repo": project["repo"], "slots": slots, "issues": items,
-            "settings": {key: settings.get(key) for key in ("merge", "preview", "preview_url", "design_venue", "build_slots", "small_slot", "quick_lane", "quick_slots", "quick_cap_minutes")},
+            "settings": {key: settings.get(key) for key in ("merge", "preview", "preview_url", "cloudflare_project", "design_venue", "build_slots", "small_slot", "quick_lane", "quick_slots", "quick_cap_minutes")},
         })
     return {
         "version": 1,

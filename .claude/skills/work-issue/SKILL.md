@@ -393,6 +393,24 @@ footprint and avoid drive-by refactors or reformatting of shared files.
      later push to the PR means rebuilding and replacing the folder, then waiting
      again before saying "updated". Previews are public pages: say so if an
      issue looks like it shouldn't be.
+   - `cloudflare` — upload the build straight to the project's Cloudflare Pages
+     project (`cloudflare_project` in the project settings): no shared branch,
+     no workflow run, no waiting. Needs `CLOUDFLARE_API_TOKEN` and
+     `CLOUDFLARE_ACCOUNT_ID` in the session environment; if either is unset, go
+     `blocked` naming the missing variable(s), as for any missing secret. After
+     the build, from the repo root:
+     `npx wrangler@4 pages deploy <dist> --project-name <cloudflare_project> --branch pr-<n> --commit-hash $(git rev-parse HEAD) --commit-dirty=true`
+     (`<dist>` is the build output folder from the project notes). It's live
+     when the command prints `Deployment complete!`. That line also gives the
+     immutable per-deployment URL (`https://<hash>.<cloudflare_project>.pages.dev`),
+     and the next line gives the alias. Record the stable per-PR alias
+     `https://pr-<n>.<cloudflare_project>.pages.dev/` as `preview`. In "Try it",
+     give the alias plus the per-deployment URL and the commit it carries.
+     Play-check at the alias right away. Every later push to the PR means
+     rebuilding and running the same command again (wrangler only uploads files
+     whose hashes changed). If it fails or says it "couldn't ascertain the final
+     status", fix it (or report an infra hiccup) before asking for review.
+     Previews are public pages: say so if an issue looks like it shouldn't be.
    - `instructions` — exact copy-paste commands to run it, plus captured output.
    - `deploy` — the project's CI deploys whatever branch was pushed to a fixed
      URL (`preview_url`). After pushing, find the workflow run for your head
@@ -414,7 +432,8 @@ footprint and avoid drive-by refactors or reformatting of shared files.
      then play-check the local build (e.g. `npx vite preview`, or the built
      files over a local static server) while it deploys. Once it's live, just
      confirm the version marker / commit and that the page loads without
-     console errors; no second full play-check at the URL.
+     console errors; no second full play-check at the URL. (`cloudflare` has
+     no wait: the upload is live when it returns, so play-check at the alias.)
    - **Quick lane: 10-minute box** on the play-check. When it runs out, stop
      and list what was and wasn't verified under the PR's Notes.
 6. Remove `.claude-bot/design-<n>.md` (or move it, per `design_doc`). Commit with a
@@ -513,6 +532,12 @@ When the PR merges (PR event, `MERGED`, or you notice it):
 3. Close the issue (reason: completed) if `Closes #n` didn't.
    With `preview: pages`, also delete `pr-<n>/` from the `previews` branch (one
    commit, rebase and retry if the push is rejected).
+   With `preview: cloudflare`, delete the PR's deployments: list them with
+   `npx wrangler@4 pages deployment list --project-name <cloudflare_project> --environment preview --json`,
+   then for each entry whose `Branch` is `pr-<n>` run
+   `npx wrangler@4 pages deployment delete <Id> --project-name <cloudflare_project> --force`
+   (`--force` also removes the one the `pr-<n>` alias points at). If Cloudflare
+   refuses one, say so in the wrap-up, don't retry in a loop.
 4. `unsubscribe_pr_activity`, notify (`my-game#12 merged — next up #15`), ping the
    orchestrator `tick`.
 
