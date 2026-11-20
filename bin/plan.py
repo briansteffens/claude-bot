@@ -562,6 +562,10 @@ def self_test():
     p = run([fixture(5, "approved", session="s5", labels=["lane:quick"])], preview="deploy", build_slots=1)
     check("preview: deploy has no quick slot", ([(b["issue"], b["slot"]) for b in p["build"]], "quick" in p["slots"]),
           ([(5, "regular")], False))
+    p = run([fixture(5, "approved", session="s5", labels=["lane:quick"])], preview="cloudflare",
+            cloudflare_project="o-previews", build_slots=1)
+    check("preview: cloudflare keeps the quick slot", ([(b["issue"], b["slot"]) for b in p["build"]], "quick" in p["slots"]),
+          ([(5, "quick")], True))
 
     p = run([fixture(1, "in-review", session="s1", _pr={"number": 9, "merged": True}),
              fixture(2, "building", session="s2"), fixture(3, "in-review", session="s3"),
