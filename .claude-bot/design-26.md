@@ -57,11 +57,8 @@ fewer flickering doors/platforms in the previews.
 - README: one line under play-checks.
 - Playbook version changes; running workers keep their old one (compatible).
 
-## Questions
-1. Where should the checker live? Default: shared `bin/flicker-check.mjs` here,
-   fetched by workers. Alternative: each game repo carries its own copy (e.g.
-   `scripts/flicker-check.mjs`) that workers commit and refine there.
-2. Flicker that the diff didn't cause (already in the game): default is report
-   it in the PR Notes with the heat map, don't fix it. Or fix if it's nearby?
-3. Quick-lane builds (e.g. a new prop spawn): default is run it, inside the
-   10-minute play-check box. Or skip it for the quick lane?
+## Decisions (owner, rev 1)
+1. Shared `bin/flicker-check.mjs` in this repo, fetched by workers from the same
+   pinned commit as the playbook.
+2. Flicker the diff didn't cause: report it in PR Notes with the heat map, don't fix.
+3. Quick lane: run it, inside the 10-minute play-check box.
