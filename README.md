@@ -216,6 +216,12 @@ click or GitHub's auto-merge enforcing rules you set.
   2. create an API token with **Cloudflare Pages: Edit** on the account;
   3. add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the claude-bot
      cloud environment (worker sessions inherit it).
+     Put the token in the environment *variable*, not in a network secret for
+     `api.cloudflare.com`: wrangler uploads files with a short-lived upload
+     token in the same `Authorization` header, and a proxy-injected secret
+     overwrites it (uploads then fail with "Authorization failed [code: 8000013]").
+     The environment's network access must allow `api.cloudflare.com` and
+     `*.pages.dev` (for the play-check).
 
   `/bot-setup` checks these and never creates them. A worker that finds a
   variable missing goes `blocked` and names it. Merged and closed PRs'
