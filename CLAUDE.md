@@ -64,6 +64,9 @@ reasoning and step in.
   `send_message`.
 - Keep tick output short — one line per project plus anything that needs the
   owner. Long logs belong in worker sessions.
+- Write all prose the bot puts on GitHub (comments, PR and design text, commit
+  messages, code comments, dashboard notes) in ASD-STE100 Simplified Technical
+  English. The rules are in the worker playbook, section "Writing style: STE".
 
 ## Labels (created in every project by `/bot-setup`)
 
