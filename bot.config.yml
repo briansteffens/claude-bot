@@ -232,6 +232,22 @@ projects:
       never put secrets in the repo. No test suite: verify scripts by running
       them (bin/gather.py and bin/dashboard.py work read-only without
       --write; python3 -m py_compile for syntax) and paste the output.
+  - repo: briansteffens/bs-factory
+    build_slots: 2
+    design_ahead: 4
+    preview: instructions
+    notes: |
+      The replacement for factory and claude-bot: one server-backed system.
+      Read CLAUDE.md first. It requires ASD-STE100 Simplified Technical English
+      for all text, and it gives the rules for numbered design documents. Read
+      docs/design/0001-architecture.md for the design and
+      docs/design/0002-build-plan.md for the task that the issue names. Do only
+      that task. TypeScript (strict) on Node 22 with npm workspaces. `npm ci`,
+      then `npm run typecheck`, `npm test` and `npm run build`. Tests never use
+      the network: use the fake forge, the fake dispatcher and the fake clock in
+      the repository. Never put a secret in the repository. For "Try it", give
+      the exact commands that run the change locally and the output that you
+      captured.
 
 schedule:
   # Poll interval while something is waiting on you or in flight.
